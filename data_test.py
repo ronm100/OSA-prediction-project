@@ -1,7 +1,22 @@
 import pyedflib
 import numpy as np
 import csv
+import  os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.fc1 = nn.Linear(32520, 10)
+        self.fc2 = nn.ReLU()
+        self.softmax = nn.Softmax(4)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.fc2(x)
+        x = self.softmax(x)
 
 def edf_get_oximetry(edf_path):
     edf = pyedflib.EdfReader(edf_path)
