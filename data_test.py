@@ -5,6 +5,7 @@ import os
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from pandas import *
+from pydot import *
 
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -35,17 +36,17 @@ def make_model(input_shape):
     conv1 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(input_layer)
     conv1 = keras.layers.BatchNormalization()(conv1)
     conv1 = keras.layers.ReLU()(conv1)
-    conv1 = keras.layers.MaxPooling1D(6)(conv1)
+    conv1 = keras.layers.MaxPooling1D(6,padding='same')(conv1)
 
     conv2 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv1)
     conv2 = keras.layers.BatchNormalization()(conv2)
     conv2 = keras.layers.ReLU()(conv2)
-    conv2 = keras.layers.MaxPooling1D(4)(conv2)
+    conv2 = keras.layers.MaxPooling1D(4,padding='same')(conv2)
 
     conv3 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv2)
     conv3 = keras.layers.BatchNormalization()(conv3)
     conv3 = keras.layers.ReLU()(conv3)
-    conv3 = keras.layers.MaxPooling1D(3)(conv3)
+    conv3 = keras.layers.MaxPooling1D(3,padding='same')(conv3)
 
     gap = keras.layers.GlobalAveragePooling1D()(conv3)
 
@@ -62,8 +63,12 @@ def main():
         x_train.append(edf_get_oximetry(path)[0:21600])
     #x_train = edf_get_oximetry('./signals/shhs1-200001.edf')
     x_train = np.stack(x_train, axis=0)
+    x_train = x_train.reshape(-1,20,21600)
     print(x_train.shape)
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:20]
-    model = make_model(input_shape=(21600,))
+    y_train = np.array(y_train)
+    y_train = y_train.reshape(-1,20)
+    print(y_train.shape)
+    model = make_model(input_shape=(1,21600))
     keras.utils.plot_model(model, show_shapes=True)
 main()
