@@ -4,8 +4,9 @@ import csv
 import os
 from tensorflow import keras
 import matplotlib.pyplot as plt
-from pandas import *
+import pandas as pd
 from pydot import *
+
 
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -17,10 +18,12 @@ def ahi_to_label(ahi):
     else:
         return 3
 
+
 def get_labels(path):
-    data = read_csv(path)
+    data = pd.read_csv(path)
     ahi = data['ahi_a0h3a']
     return list(map(ahi_to_label, ahi))
+
 
 def edf_get_oximetry(edf_path):
     edf = pyedflib.EdfReader(edf_path)
@@ -29,24 +32,25 @@ def edf_get_oximetry(edf_path):
     signal = np.array(position).astype(float)
     return signal
 
+
 def make_model(input_shape):
-    num_classes  = 4
+    num_classes = 4
     input_layer = keras.layers.Input(input_shape)
 
     conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(input_layer)
     conv1 = keras.layers.BatchNormalization()(conv1)
     conv1 = keras.layers.ReLU()(conv1)
-    conv1 = keras.layers.MaxPooling1D(2,padding='same')(conv1)
+    conv1 = keras.layers.MaxPooling1D(2, padding='same')(conv1)
 
     conv2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv1)
     conv2 = keras.layers.BatchNormalization()(conv2)
     conv2 = keras.layers.ReLU()(conv2)
-    conv2 = keras.layers.MaxPooling1D(6,padding='same')(conv2)
+    conv2 = keras.layers.MaxPooling1D(6, padding='same')(conv2)
 
     conv3 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv2)
     conv3 = keras.layers.BatchNormalization()(conv3)
     conv3 = keras.layers.ReLU()(conv3)
-    conv3 = keras.layers.MaxPooling1D(6,padding='same')(conv3)
+    conv3 = keras.layers.MaxPooling1D(6, padding='same')(conv3)
 
     gap = keras.layers.GlobalAveragePooling1D()(conv3)
 
@@ -55,25 +59,24 @@ def make_model(input_shape):
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
 
 
-
-def main():
+if __name__ == 'main':
     x_train = []
-    semple_length=21600
-    num_of_semples=80
+    semple_length = 21600
+    num_of_semples = 20
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
     y_train = np.array(y_train)
-    y_train = y_train.reshape(num_of_semples,-1)
-    for i in range(1, num_of_semples+1):
+    y_train = y_train.reshape(num_of_semples, -1)
+    for i in range(1, num_of_semples + 1):
         path = './signals/shhs1-2000' + str(i).zfill(2) + '.edf'
-        temp=edf_get_oximetry(path)[0:semple_length]
+        temp = edf_get_oximetry(path)[0:semple_length]
         if np.shape(temp) == (semple_length,):
             x_train.append(temp)
         else:
-            y_train = np.delete(y_train, i-1, 0)
+            y_train = np.delete(y_train, i - 1, 0)
     x_train = np.stack(x_train, axis=0)
     x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
     model = make_model(input_shape=x_train.shape[1:])
-    keras.utils.plot_model(model, show_shapes=True)
+    # keras.utils.plot_model(model, show_shapes=True)
 
     epochs = 10
     batch_size = 8
@@ -112,7 +115,3 @@ def main():
     plt.legend(["train", "val"], loc="best")
     plt.show()
     plt.close()
-
-
-
-main()
