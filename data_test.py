@@ -131,14 +131,12 @@ if __name__ == '__main__':
     ret = model.evaluate(x_train, y_train, verbose=0)
     print(f'ret = {ret} \n names = {model.metrics_names}')
 
-    for metric in history.
-    metric = "sparse_categorical_accuracy"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.show()
-    plt.close()
+    for i, metric in enumerate(list(history.history.keys())):
+        plt.figure(i)
+        plt.plot(history.history[metric])
+        plt.plot(history.history["val_" + metric])
+        plt.title("model " + metric)
+        plt.ylabel(metric, fontsize="large")
+        plt.xlabel("epoch", fontsize="large")
+        plt.legend(["train", "val"], loc="best")
+        plt.show()
