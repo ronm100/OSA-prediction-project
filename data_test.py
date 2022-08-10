@@ -7,6 +7,28 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
 
+# from keras import backend as K
+
+
+def recall_m(y_true, y_pred):
+    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
+    possible_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + keras.backend.epsilon())
+    return recall
+
+
+def precision_m(y_true, y_pred):
+    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + keras.backend.epsilon())
+    return precision
+
+
+def f1_m(y_true, y_pred):
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
+    return 2 * ((precision * recall) / (precision + recall + keras.backend.epsilon()))
+
 
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -59,7 +81,7 @@ def make_model(input_shape):
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     x_train = []
     semple_length = 21600
     num_of_semples = 20
@@ -93,7 +115,7 @@ if __name__ == 'main':
     model.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
-        metrics=["sparse_categorical_accuracy"],
+        metrics=["sparse_categorical_accuracy", f1_m],
     )
     history = model.fit(
         x_train,
@@ -105,6 +127,11 @@ if __name__ == 'main':
         verbose=1,
     )
 
+    # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
+    ret = model.evaluate(x_train, y_train, verbose=0)
+    print(f'ret = {ret} \n names = {model.metrics_names}')
+
+    for metric in history.
     metric = "sparse_categorical_accuracy"
     plt.figure()
     plt.plot(history.history[metric])
