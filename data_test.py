@@ -6,28 +6,35 @@ from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
+import tensorflow_addons as tfa
 
 # from keras import backend as K
 
 
-def recall_m(y_true, y_pred):
-    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
-    possible_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + keras.backend.epsilon())
-    return recall
+def sensitivity(y_true, y_pred): # TP/(TP+FN)
+    true_positives = keras.backend.sum(keras.backend.cast(y_true * y_pred, 'float'), axis = 0)
+    possible_positives = keras.backend.sum(keras.backend.cast(y_true, 'float'), axis = 0)
+    sensitivity = true_positives / (possible_positives + keras.backend.epsilon())
+    return sensitivity
 
 
-def precision_m(y_true, y_pred):
-    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_pred, 0, 1)))
+def precision(y_true, y_pred):  # TP/(TP+FP)
+    true_positives = keras.backend.sum(keras.backend.cast(y_true * y_pred,'float'), axis = 0)
+    predicted_positives = keras.backend.sum(keras.backend.cast(y_pred,'float'), axis = 0)
     precision = true_positives / (predicted_positives + keras.backend.epsilon())
     return precision
 
 
-def f1_m(y_true, y_pred):
-    precision = precision_m(y_true, y_pred)
-    recall = recall_m(y_true, y_pred)
-    return 2 * ((precision * recall) / (precision + recall + keras.backend.epsilon()))
+def f1(y_true, y_pred): # 2*(precision * sensitivity) / (precision + sensitivity) = TP/(TP+(FP+FN)/2)
+    pre = precision(y_true, y_pred)
+    se = sensitivity(y_true, y_pred)
+    return 2 * ((pre * se) / (pre + se + keras.backend.epsilon()))
+
+def specificity(y_true, y_pred):  # TN/(TN+FP)
+    true_negatives = keras.backend.sum(keras.backend.cast((1-y_true) * (1-y_pred),'float'), axis = 0)
+    possible_negatives = keras.backend.sum(keras.backend.cast((1-y_true),'float'), axis = 0)
+    specificity = true_negatives / (possible_negatives + keras.backend.epsilon())
+    return specificity
 
 
 def ahi_to_label(ahi):
@@ -89,7 +96,7 @@ if __name__ == '__main__':
     y_train = np.array(y_train)
     y_train = y_train.reshape(num_of_semples, -1)
     for i in range(1, num_of_semples + 1):
-        path = './signals/shhs1-2000' + str(i).zfill(2) + '.edf'
+        path = './signals/shhs1-2' + str(i).zfill(5) + '.edf'
         temp = edf_get_oximetry(path)[0:semple_length]
         if np.shape(temp) == (semple_length,):
             x_train.append(temp)
@@ -98,10 +105,10 @@ if __name__ == '__main__':
     x_train = np.stack(x_train, axis=0)
     x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
     model = make_model(input_shape=x_train.shape[1:])
-    # keras.utils.plot_model(model, show_shapes=True)
+    keras.utils.plot_model(model, show_shapes=True)
 
-    epochs = 10
-    batch_size = 8
+    epochs = 4
+    batch_size = 5
 
     callbacks = [
         keras.callbacks.ModelCheckpoint(
@@ -115,7 +122,7 @@ if __name__ == '__main__':
     model.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
-        metrics=["sparse_categorical_accuracy", f1_m],
+        metrics=[tfa.metrics.F1Score(average='macro',num_classes=4), sensitivity, specificity, 'accuracy'],
     )
     history = model.fit(
         x_train,
@@ -130,9 +137,9 @@ if __name__ == '__main__':
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
     ret = model.evaluate(x_train, y_train, verbose=0)
     print(f'ret = {ret} \n names = {model.metrics_names}')
+    print(history.history.keys())
 
-    for metric in history.
-    metric = "sparse_categorical_accuracy"
+    metric = "tfa.metrics.F1Score"
     plt.figure()
     plt.plot(history.history[metric])
     plt.plot(history.history["val_" + metric])
@@ -142,3 +149,37 @@ if __name__ == '__main__':
     plt.legend(["train", "val"], loc="best")
     plt.show()
     plt.close()
+
+    metric = "sensitivity"
+    plt.figure()
+    plt.plot(history.history[metric])
+    plt.plot(history.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.show()
+    plt.close()
+
+    metric = "specificity"
+    plt.figure()
+    plt.plot(history.history[metric])
+    plt.plot(history.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.show()
+    plt.close()
+
+    metric = 'acc'
+    plt.figure()
+    plt.plot(history.history[metric])
+    plt.plot(history.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.show()
+    plt.close()
+
