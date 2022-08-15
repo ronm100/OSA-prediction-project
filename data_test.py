@@ -6,35 +6,10 @@ from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
-import tensorflow_addons as tfa
+from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 
 # from keras import backend as K
 
-
-def sensitivity(y_true, y_pred): # TP/(TP+FN)
-    true_positives = keras.backend.sum(keras.backend.cast(y_true * y_pred, 'float'), axis = 0)
-    possible_positives = keras.backend.sum(keras.backend.cast(y_true, 'float'), axis = 0)
-    sensitivity = true_positives / (possible_positives + keras.backend.epsilon())
-    return sensitivity
-
-
-def precision(y_true, y_pred):  # TP/(TP+FP)
-    true_positives = keras.backend.sum(keras.backend.cast(y_true * y_pred,'float'), axis = 0)
-    predicted_positives = keras.backend.sum(keras.backend.cast(y_pred,'float'), axis = 0)
-    precision = true_positives / (predicted_positives + keras.backend.epsilon())
-    return precision
-
-
-def f1(y_true, y_pred): # 2*(precision * sensitivity) / (precision + sensitivity) = TP/(TP+(FP+FN)/2)
-    pre = precision(y_true, y_pred)
-    se = sensitivity(y_true, y_pred)
-    return 2 * ((pre * se) / (pre + se + keras.backend.epsilon()))
-
-def specificity(y_true, y_pred):  # TN/(TN+FP)
-    true_negatives = keras.backend.sum(keras.backend.cast((1-y_true) * (1-y_pred),'float'), axis = 0)
-    possible_negatives = keras.backend.sum(keras.backend.cast((1-y_true),'float'), axis = 0)
-    specificity = true_negatives / (possible_negatives + keras.backend.epsilon())
-    return specificity
 
 
 def ahi_to_label(ahi):
@@ -105,7 +80,7 @@ if __name__ == '__main__':
     x_train = np.stack(x_train, axis=0)
     x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
     model = make_model(input_shape=x_train.shape[1:])
-    keras.utils.plot_model(model, show_shapes=True)
+    # keras.utils.plot_model(model, show_shapes=True)
 
     epochs = 4
     batch_size = 5
@@ -122,7 +97,7 @@ if __name__ == '__main__':
     model.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
-        metrics=[tfa.metrics.F1Score(average='macro',num_classes=4), sensitivity, specificity, 'accuracy'],
+        metrics=['sparse_categorical_accuracy']
     )
     history = model.fit(
         x_train,
@@ -135,44 +110,19 @@ if __name__ == '__main__':
     )
 
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
-    ret = model.evaluate(x_train, y_train, verbose=0)
-    print(f'ret = {ret} \n names = {model.metrics_names}')
-    print(history.history.keys())
+    y_pred = np.argmax(model.predict(x_train), axis=1)
+    f1 = f1_score(y_train, y_pred, average='macro')
+    confusion_m = confusion_matrix(y_train, y_pred)
+    # auc_score = roc_auc_score(y_train, y_pred)
+    acc = accuracy_score(y_train, y_pred)
+    recall = recall_score(y_train, y_pred)
+    print(f'f1 score is: {f1}')
+    # print(f'roc_auc_score is: {roc_auc_score}')
+    print(f'accuracy score score is: {acc}')
+    print(f'recall_score is: {recall}')
+    print(f'confusion matrix is:\n {confusion_m}')
 
-    metric = "tfa.metrics.F1Score"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.show()
-    plt.close()
-
-    metric = "sensitivity"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.show()
-    plt.close()
-
-    metric = "specificity"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.show()
-    plt.close()
-
-    metric = 'acc'
+    metric = "sparse_categorical_accuracy"
     plt.figure()
     plt.plot(history.history[metric])
     plt.plot(history.history["val_" + metric])
