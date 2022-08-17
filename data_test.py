@@ -120,6 +120,7 @@ if __name__ == '__main__':
     print(f'recall_score is: {recall}')
     print(f'confusion matrix is:\n {confusion_m}')
 
+
     metric = "sparse_categorical_accuracy"
     plt.figure()
     plt.plot(history.history[metric])
@@ -130,4 +131,3 @@ if __name__ == '__main__':
     plt.legend(["train", "val"], loc="best")
     plt.show()
     plt.close()
-
