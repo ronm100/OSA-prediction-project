@@ -1,4 +1,6 @@
 
 *.edf
+.idea/*
 *.h5
 *.zip
+

@@ -6,29 +6,8 @@ from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
-
+from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 # from keras import backend as K
-
-
-def recall_m(y_true, y_pred):
-    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
-    possible_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + keras.backend.epsilon())
-    return recall
-
-
-def precision_m(y_true, y_pred):
-    true_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = keras.backend.sum(keras.backend.round(keras.backend.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + keras.backend.epsilon())
-    return precision
-
-
-def f1_m(y_true, y_pred):
-    precision = precision_m(y_true, y_pred)
-    recall = recall_m(y_true, y_pred)
-    return 2 * ((precision * recall) / (precision + recall + keras.backend.epsilon()))
-
 
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -89,7 +68,7 @@ if __name__ == '__main__':
     y_train = np.array(y_train)
     y_train = y_train.reshape(num_of_semples, -1)
     for i in range(1, num_of_semples + 1):
-        path = './signals/shhs1-2000' + str(i).zfill(2) + '.edf'
+        path = './signals/shhs1-2' + str(i).zfill(5) + '.edf'
         temp = edf_get_oximetry(path)[0:semple_length]
         if np.shape(temp) == (semple_length,):
             x_train.append(temp)
@@ -100,8 +79,8 @@ if __name__ == '__main__':
     model = make_model(input_shape=x_train.shape[1:])
     # keras.utils.plot_model(model, show_shapes=True)
 
-    epochs = 10
-    batch_size = 8
+    epochs = 4
+    batch_size = 5
 
     callbacks = [
         keras.callbacks.ModelCheckpoint(
@@ -115,7 +94,7 @@ if __name__ == '__main__':
     model.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
-        metrics=["sparse_categorical_accuracy", f1_m],
+        metrics=['sparse_categorical_accuracy']
     )
     history = model.fit(
         x_train,
@@ -128,15 +107,27 @@ if __name__ == '__main__':
     )
 
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
-    ret = model.evaluate(x_train, y_train, verbose=0)
-    print(f'ret = {ret} \n names = {model.metrics_names}')
+    y_pred_probs = model.predict(x_train)
+    y_pred = np.argmax(y_pred_probs, axis=1)
+    f1 = f1_score(y_train, y_pred, average='macro')
+    confusion_m = confusion_matrix(y_train, y_pred)
+    auc_score = roc_auc_score(y_train, y_pred_probs, average='macro', multi_class='ovr')
+    acc = accuracy_score(y_train, y_pred)
+    recall = recall_score(y_train, y_pred, average='macro')
+    print(f'f1 score is: {f1}')
+    print(f'roc_auc_score is: {auc_score}')
+    print(f'accuracy score is: {acc}')
+    print(f'recall_score is: {recall}')
+    print(f'confusion matrix is:\n {confusion_m}')
 
-    for i, metric in enumerate(list(history.history.keys())):
-        plt.figure(i)
-        plt.plot(history.history[metric])
-        plt.plot(history.history["val_" + metric])
-        plt.title("model " + metric)
-        plt.ylabel(metric, fontsize="large")
-        plt.xlabel("epoch", fontsize="large")
-        plt.legend(["train", "val"], loc="best")
-        plt.show()
+
+    metric = "sparse_categorical_accuracy"
+    plt.figure()
+    plt.plot(history.history[metric])
+    plt.plot(history.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.show()
+    plt.close()
