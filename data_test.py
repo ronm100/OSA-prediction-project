@@ -7,10 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
-
 # from keras import backend as K
-
-
 
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -110,15 +107,16 @@ if __name__ == '__main__':
     )
 
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
-    y_pred = np.argmax(model.predict(x_train), axis=1)
+    y_pred_probs = model.predict(x_train)
+    y_pred = np.argmax(y_pred_probs, axis=1)
     f1 = f1_score(y_train, y_pred, average='macro')
     confusion_m = confusion_matrix(y_train, y_pred)
-    # auc_score = roc_auc_score(y_train, y_pred)
+    auc_score = roc_auc_score(y_train, y_pred_probs, average='macro', multi_class='ovr')
     acc = accuracy_score(y_train, y_pred)
-    recall = recall_score(y_train, y_pred)
+    recall = recall_score(y_train, y_pred, average='macro')
     print(f'f1 score is: {f1}')
-    # print(f'roc_auc_score is: {roc_auc_score}')
-    print(f'accuracy score score is: {acc}')
+    print(f'roc_auc_score is: {auc_score}')
+    print(f'accuracy score is: {acc}')
     print(f'recall_score is: {recall}')
     print(f'confusion matrix is:\n {confusion_m}')
 
