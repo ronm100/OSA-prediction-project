@@ -9,6 +9,7 @@ from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 # from keras import backend as K
 
+SIGNAL_DIR = './signals'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -67,17 +68,21 @@ if __name__ == '__main__':
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
     y_train = np.array(y_train)
     y_train = y_train.reshape(num_of_semples, -1)
-    for i in range(1, num_of_semples + 1):
-        path = './signals/shhs1-2' + str(i).zfill(5) + '.edf'
-        temp = edf_get_oximetry(path)[0:semple_length]
+
+    all_paths = os.listdir(SIGNAL_DIR)
+    all_paths.sort()
+    paths = all_paths[0:num_of_semples]
+    for path in paths:
+        temp = edf_get_oximetry(SIGNAL_DIR + '/' + path)[0:semple_length]
+        edf_index = int(path[7:11])
         if np.shape(temp) == (semple_length,):
             x_train.append(temp)
         else:
-            y_train = np.delete(y_train, i - 1, 0)
+            y_train = np.delete(y_train, edf_index - 1, 0)
     x_train = np.stack(x_train, axis=0)
     x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
     model = make_model(input_shape=x_train.shape[1:])
-    # keras.utils.plot_model(model, show_shapes=True)
+    keras.utils.plot_model(model, show_shapes=True)
 
     epochs = 4
     batch_size = 5
