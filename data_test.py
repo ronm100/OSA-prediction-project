@@ -9,7 +9,7 @@ from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 # from keras import backend as K
 
-SIGNAL_DIR = './signals'
+SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -64,7 +64,7 @@ def make_model(input_shape):
 if __name__ == '__main__':
     x_train = []
     semple_length = 21600
-    num_of_semples = 20
+    num_of_semples = 1000
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
     y_train = np.array(y_train)
     y_train = y_train.reshape(num_of_semples, -1)
@@ -84,8 +84,8 @@ if __name__ == '__main__':
     model = make_model(input_shape=x_train.shape[1:])
     keras.utils.plot_model(model, show_shapes=True)
 
-    epochs = 4
-    batch_size = 5
+    epochs = 100
+    batch_size = 200
 
     callbacks = [
         keras.callbacks.ModelCheckpoint(
