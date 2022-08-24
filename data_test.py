@@ -64,7 +64,7 @@ def make_model(input_shape):
 if __name__ == '__main__':
     x_train = []
     semple_length = 21600
-    num_of_semples = 1000
+    num_of_semples = 500
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
     y_train = np.array(y_train)
     y_train = y_train.reshape(num_of_semples, -1)
@@ -84,17 +84,17 @@ if __name__ == '__main__':
     model = make_model(input_shape=x_train.shape[1:])
     keras.utils.plot_model(model, show_shapes=True)
 
-    epochs = 100
-    batch_size = 200
+    epochs = 10000
+    batch_size = 32
 
     callbacks = [
         keras.callbacks.ModelCheckpoint(
             "best_model.h5", save_best_only=True, monitor="val_loss"
         ),
         keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=20, min_lr=0.0001
+            monitor="val_loss", factor=0.5, patience=4, min_lr=0.0001
         ),
-        keras.callbacks.EarlyStopping(monitor="val_loss", patience=50, verbose=1),
+        keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, verbose=1),
     ]
     model.compile(
         optimizer="adam",
