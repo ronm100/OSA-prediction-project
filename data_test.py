@@ -1,3 +1,6 @@
+SIGNAL_DIR =
+
+
 import pyedflib
 import numpy as np
 import csv
@@ -9,7 +12,9 @@ from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 # from keras import backend as K
 
-SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
+MODEL_NAME = 'data_test_1'
+LOG_DIR = './' + MODEL_NAME
+CSV_DIR = './data_as_csv'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -62,69 +67,43 @@ def make_model(input_shape):
 
 
 if __name__ == '__main__':
-    x_train = []
+
     semple_length = 21600
-    num_of_semples = 500
-    y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
-    y_train = np.array(y_train)
-    y_train = y_train.reshape(num_of_semples, -1)
+    num_of_semples = 10
 
-    all_paths = os.listdir(SIGNAL_DIR)
-    all_paths.sort()
-    paths = all_paths[0:num_of_semples]
-    for path in paths:
-        temp = edf_get_oximetry(SIGNAL_DIR + '/' + path)[0:semple_length]
-        edf_index = int(path[7:11])
-        if np.shape(temp) == (semple_length,):
-            x_train.append(temp)
-        else:
-            y_train = np.delete(y_train, edf_index - 1, 0)
-    x_train = np.stack(x_train, axis=0)
+    x_train = pd.read_csv(CSV_DIR + '/' + 'x_train.csv')[0:num_of_semples]
+    x_train = np.array(x_train)
     x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+    y_train = pd.read_csv(CSV_DIR + '/' + 'y_train.csv')
+    y_train = np.array(y_train)[0:num_of_semples,1]
+    y_train = y_train.reshape(num_of_semples, -1)
     model = make_model(input_shape=x_train.shape[1:])
-    keras.utils.plot_model(model, show_shapes=True)
+    keras.utils.plot_model(model, to_file = LOG_DIR + '/' + MODEL_NAME+ "_architecture.png", show_shapes=True)
+    epochs = 5
+    batch_size = 5
+    callbacks = [keras.callbacks.ModelCheckpoint("best_model.h5", save_best_only=True, monitor="val_loss"),
+                 keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.0001),
+                 keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, verbose=1),]
 
-    epochs = 10000
-    batch_size = 32
+    model.compile (optimizer="adam",loss="sparse_categorical_crossentropy",
+                   metrics=['sparse_categorical_accuracy'])
 
-    callbacks = [
-        keras.callbacks.ModelCheckpoint(
-            "best_model.h5", save_best_only=True, monitor="val_loss"
-        ),
-        keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=4, min_lr=0.0001
-        ),
-        keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, verbose=1),
-    ]
-    model.compile(
-        optimizer="adam",
-        loss="sparse_categorical_crossentropy",
-        metrics=['sparse_categorical_accuracy']
-    )
-    history = model.fit(
-        x_train,
-        y_train,
-        batch_size=batch_size,
-        epochs=epochs,
-        callbacks=callbacks,
-        validation_split=0.2,
-        verbose=1,
-    )
+    history = model.fit (x_train, y_train, batch_size=batch_size, epochs=epochs,
+                        callbacks=callbacks, validation_split=0.2, verbose=1,)
 
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
     y_pred_probs = model.predict(x_train)
     y_pred = np.argmax(y_pred_probs, axis=1)
-    f1 = f1_score(y_train, y_pred, average='macro')
+    f1 = "%.3f" % f1_score(y_train, y_pred, average='macro')
     confusion_m = confusion_matrix(y_train, y_pred)
-    auc_score = roc_auc_score(y_train, y_pred_probs, average='macro', multi_class='ovr')
-    acc = accuracy_score(y_train, y_pred)
-    recall = recall_score(y_train, y_pred, average='macro')
-    print(f'f1 score is: {f1}')
+    auc_score = "%.3f" % roc_auc_score(y_train, y_pred_probs, average='macro', multi_class='ovr')
+    acc ="%.3f" % accuracy_score(y_train, y_pred)
+    recall ="%.3f" % recall_score(y_train, y_pred, average='macro')
+    print(f'f1 score is: {f1}' )
     print(f'roc_auc_score is: {auc_score}')
     print(f'accuracy score is: {acc}')
     print(f'recall_score is: {recall}')
     print(f'confusion matrix is:\n {confusion_m}')
-
 
     metric = "sparse_categorical_accuracy"
     plt.figure()
@@ -134,5 +113,31 @@ if __name__ == '__main__':
     plt.ylabel(metric, fontsize="large")
     plt.xlabel("epoch", fontsize="large")
     plt.legend(["train", "val"], loc="best")
+    plt.savefig(LOG_DIR+ '/' + metric + '_figure.png')
     plt.show()
     plt.close()
+
+    metric = "loss"
+    plt.figure()
+    plt.plot(history.history[metric])
+    plt.plot(history.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.savefig(LOG_DIR+ '/' + metric + '_figure.png')
+    plt.show()
+    plt.close()
+
+
+    if not os.path.exists(MODEL_NAME):
+        os.makedirs(MODEL_NAME)
+    file = open(LOG_DIR+ '/' + MODEL_NAME + '_matrics_log.txt', 'w+')
+    file.write(MODEL_NAME + '\n')
+    file.write('f1 score is: ' + str(f1) + '\n')
+    file.write('roc_auc_score is: ' + str(auc_score) + '\n')
+    file.write('accuracy score is: ' + str(acc) + '\n')
+    file.write('recall_score is: ' + str(recall) + '\n')
+    file.close()
+
+    pd.DataFrame(confusion_m).to_csv(LOG_DIR + '/' + MODEL_NAME + '_confusion_matrix.csv')
