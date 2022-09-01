@@ -1,6 +1,3 @@
-SIGNAL_DIR =
-
-
 import pyedflib
 import numpy as np
 import csv
@@ -10,11 +7,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
+from sklearn.model_selection import train_test_split
+import sys
 # from keras import backend as K
 
 MODEL_NAME = 'data_test_1'
-LOG_DIR = './' + MODEL_NAME
-CSV_DIR = './data_as_csv'
+LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
+CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -69,19 +68,29 @@ def make_model(input_shape):
 if __name__ == '__main__':
 
     semple_length = 21600
-    num_of_semples = 10
-
-    x_train = pd.read_csv(CSV_DIR + '/' + 'x_train.csv')[0:num_of_semples]
-    x_train = np.array(x_train)
-    x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
-    y_train = pd.read_csv(CSV_DIR + '/' + 'y_train.csv')
-    y_train = np.array(y_train)[0:num_of_semples,1]
-    y_train = y_train.reshape(num_of_semples, -1)
+    num_of_semples = 5755
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+    # else:
+    #     print("files already exists, please delete the" + MODEL_NAME + "directory and try again")
+    #     sys.exit()
+    x_train = []
+    y_train = []
+    x_test = []
+    y_test = []
+    x = pd.read_csv(CSV_DIR + '/' + 'x_train.csv', nrows = num_of_semples)
+    x = np.array(x)
+    x = x[:,0:21600]
+    x = x.reshape((x.shape[0], x.shape[1], 1))
+    y = pd.read_csv(CSV_DIR + '/' + 'y_train.csv', nrows = num_of_semples)
+    y = np.array(y)[0:num_of_semples,1]
+    y = y.reshape(num_of_semples, -1)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.20, random_state = 42)
     model = make_model(input_shape=x_train.shape[1:])
     keras.utils.plot_model(model, to_file = LOG_DIR + '/' + MODEL_NAME+ "_architecture.png", show_shapes=True)
-    epochs = 5
-    batch_size = 5
-    callbacks = [keras.callbacks.ModelCheckpoint("best_model.h5", save_best_only=True, monitor="val_loss"),
+    epochs = 100
+    batch_size = 32
+    callbacks = [keras.callbacks.ModelCheckpoint(LOG_DIR + '/' + MODEL_NAME + "_best_model.h5", save_best_only=True, monitor="val_loss"),
                  keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.0001),
                  keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, verbose=1),]
 
@@ -113,8 +122,7 @@ if __name__ == '__main__':
     plt.ylabel(metric, fontsize="large")
     plt.xlabel("epoch", fontsize="large")
     plt.legend(["train", "val"], loc="best")
-    plt.savefig(LOG_DIR+ '/' + metric + '_figure.png')
-    plt.show()
+    plt.savefig(LOG_DIR + '/' + metric + '_figure.png')
     plt.close()
 
     metric = "loss"
@@ -125,19 +133,16 @@ if __name__ == '__main__':
     plt.ylabel(metric, fontsize="large")
     plt.xlabel("epoch", fontsize="large")
     plt.legend(["train", "val"], loc="best")
-    plt.savefig(LOG_DIR+ '/' + metric + '_figure.png')
-    plt.show()
+    plt.savefig(LOG_DIR + '/' + metric + '_figure.png')
     plt.close()
 
 
-    if not os.path.exists(MODEL_NAME):
-        os.makedirs(MODEL_NAME)
-    file = open(LOG_DIR+ '/' + MODEL_NAME + '_matrics_log.txt', 'w+')
-    file.write(MODEL_NAME + '\n')
-    file.write('f1 score is: ' + str(f1) + '\n')
-    file.write('roc_auc_score is: ' + str(auc_score) + '\n')
-    file.write('accuracy score is: ' + str(acc) + '\n')
-    file.write('recall_score is: ' + str(recall) + '\n')
-    file.close()
+
+    with open(LOG_DIR + '/' + MODEL_NAME + '_matrics_log.txt', 'w+') as file:
+        file.write(MODEL_NAME + '\n')
+        file.write('f1 score is: ' + str(f1) + '\n')
+        file.write('roc_auc_score is: ' + str(auc_score) + '\n')
+        file.write('accuracy score is: ' + str(acc) + '\n')
+        file.write('recall_score is: ' + str(recall) + '\n')
 
     pd.DataFrame(confusion_m).to_csv(LOG_DIR + '/' + MODEL_NAME + '_confusion_matrix.csv')
