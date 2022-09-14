@@ -11,9 +11,9 @@ from sklearn.model_selection import train_test_split
 import sys
 # from keras import backend as K
 
-MODEL_NAME = 'data_test_1'
-LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
-CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv'
+MODEL_NAME = '1_gru_test'
+LOG_DIR = MODEL_NAME
+CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv_2000'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -43,6 +43,10 @@ def make_model(input_shape):
     num_classes = 4
     input_layer = keras.layers.Input(input_shape)
 
+    gru = keras.layers.GRU(4)(input_layer)
+    gru_out = keras.layers.BatchNormalization()(gru)
+
+
     conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(input_layer)
     conv1 = keras.layers.BatchNormalization()(conv1)
     conv1 = keras.layers.ReLU()(conv1)
@@ -60,7 +64,9 @@ def make_model(input_shape):
 
     gap = keras.layers.GlobalAveragePooling1D()(conv3)
 
-    output_layer = keras.layers.Dense(num_classes, activation="softmax")(gap)
+    cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
+
+    output_layer = keras.layers.BatchNormalization()(cnn_out + gru_out)
 
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
 
@@ -68,7 +74,7 @@ def make_model(input_shape):
 if __name__ == '__main__':
 
     semple_length = 21600
-    num_of_semples = 5755
+    num_of_semples = 2000
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
     # else:
