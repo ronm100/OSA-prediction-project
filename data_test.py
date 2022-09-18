@@ -13,7 +13,8 @@ import sys
 
 MODEL_NAME = '1_gru_test'
 LOG_DIR = MODEL_NAME
-CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv_2000'
+# CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv_2000'
+CSV_DIR = '../../data_as_csv_2000'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -44,6 +45,7 @@ def make_model(input_shape):
     input_layer = keras.layers.Input(input_shape)
 
     gru = keras.layers.GRU(4)(input_layer)
+    gru = keras.layers.Dense(num_classes, activation="softmax")(gru)
     gru_out = keras.layers.BatchNormalization()(gru)
 
 
@@ -66,7 +68,10 @@ def make_model(input_shape):
 
     cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
 
-    output_layer = keras.layers.BatchNormalization()(cnn_out + gru_out)
+    # output_layer = keras.layers.BatchNormalization()(cnn_out/2 + gru_out/2)
+    concatted = keras.layers.Concatenate()([cnn_out, gru_out])
+
+    output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
 
