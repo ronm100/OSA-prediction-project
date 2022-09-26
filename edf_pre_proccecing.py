@@ -39,11 +39,9 @@ def edf_get_oximetry(edf_path):
 if __name__ == '__main__':
     x_train = []
     semple_length = 21600
-    num_of_semples = 5804
-    y_train = get_labels('./shhs1-dataset-0.14.0.csv')[0:num_of_semples]
+    num_of_semples = 5800
+    y_train = get_labels('./shhs1-dataset-0.14.0.csv')
     y_train = np.array(y_train)
-    y_train = y_train.reshape(num_of_semples, -1)
-
     if not os.path.exists(CSV_DIR):
         os.makedirs(CSV_DIR)
     else:
