@@ -11,9 +11,11 @@ from sklearn.model_selection import train_test_split
 import sys
 # from keras import backend as K
 
-MODEL_NAME = '2_gru_test'
-LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
-CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
+MODEL_NAME = '128_units_gru_concat_before_dense'
+# LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
+# CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
+LOG_DIR = './logs/' + MODEL_NAME
+CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -54,9 +56,9 @@ def make_model(input_shape):
     conv_gru2 = keras.layers.ReLU()(conv_gru2)
     conv_gru2 = keras.layers.MaxPooling1D(2, padding='same')(conv_gru2)
 
-    gru = keras.layers.GRU(4)(conv_gru2)
-    gru = keras.layers.Dense(num_classes, activation="softmax")(gru)
-    gru = keras.layers.BatchNormalization()(gru)
+    gru = keras.layers.GRU(128)(conv_gru2)
+    # gru = keras.layers.Dense(num_classes, activation="softmax")(gru)
+    # gru = keras.layers.BatchNormalization()(gru)
 
     conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="causal", dilation_rate=2)(input_layer)
     conv1 = keras.layers.BatchNormalization()(conv1)
@@ -109,9 +111,9 @@ def make_model(input_shape):
     # gap = keras.layers.Dense(500, activation="relu")(flattened)
 
     gap = keras.layers.GlobalAveragePooling1D()(conv8)
-    cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
-    # output_layer = keras.layers.BatchNormalization(cnn_out + gru_out)
-    concatted = keras.layers.Concatenate()([cnn_out, gru])
+    # cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
+
+    concatted = keras.layers.Concatenate()([gap, gru])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
