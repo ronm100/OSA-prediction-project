@@ -5,7 +5,7 @@ import pandas as pd
 import sys
 
 SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
-CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/data_as_csv'
+CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
 
 
 def ahi_to_label(ahi):
@@ -36,7 +36,7 @@ def edf_get_oximetry(edf_path):
     return signal
 
 
-if __name__ == '__main__':
+def edf_to_csv():
     x_train = []
     semple_length = 21600
     num_of_semples = 5800
@@ -63,10 +63,10 @@ if __name__ == '__main__':
             x_train.append(temp)
             x_indexes.append(edf_index - 1)
             if (edf_index - 1) != last_index:
-                for i in range(last_index, edf_index-1):
+                for i in range(last_index, edf_index - 1):
                     skipped_indexes.append(i)
                     print(f'skipped unvalid semple: ' + str(i))
-            if ((edf_index-1) % 10) == 0:
+            if ((edf_index - 1) % 10) == 0:
                 print('semple number = ' + str(edf_index - 1))
             last_index = edf_index
     pd.DataFrame(y_train).to_csv(CSV_DIR + '/' + 'y_train_full.csv')
@@ -76,5 +76,19 @@ if __name__ == '__main__':
     pd.DataFrame(y_train).to_csv(CSV_DIR + '/' + 'y_train.csv')
     pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_semples_inedex.csv')
     pd.DataFrame(skipped_indexes).to_csv(CSV_DIR + '/' + 'skipped_semples.csv')
-    x_indexes = [x_indexes,y_train]
+    x_indexes = [x_indexes, y_train]
     pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_semples_inedex_with_lables.csv')
+
+
+def compute_and_save_dft(dir_path):
+    x_train = pd.read_csv(dir_path + 'x_train.csv')
+    x_train_fft = np.fft.rfft(x_train, axis=-1)
+    x_train_fft_norm = np.abs(x_train_fft) ** 2
+    x_train_fft_tensor = np.concatenate((x_train_fft.real, x_train_fft.img),
+                                        axis=2)  # should be tensor of shape (x,x,2)
+    x_train_fft_norm.to_csv(dir_path + 'x_train_fft_norm.csv')
+    x_train_fft_tensor.to_csv(dir_path + 'x_train_fft_tensor')
+
+
+if __name__ == '__main__':
+    compute_and_save_dft(CSV_DIR)
