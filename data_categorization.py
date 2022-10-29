@@ -9,7 +9,7 @@ sub_categories = {
     'gender': ['male', 'female'],
     'age_category_s1': ['35-44', '45-54', '55-64', '65-74', '75-84', '85+'],
     'smokstat_s1': ['Never', 'Current', 'Former'],
-    'bmi': ['18-20', '20-30', '30-40', '40-50']
+    'bmi': ['18-22', '22-26', '26-30', '30-34', '34-41', '41-50']
 }
 RAW_LABEL_COL = 'ahi_a0h3a'
 
@@ -64,11 +64,26 @@ def add_total_to_x_axis(category, totals):
         sub_categories_with_totals.append(sub_cat + f'({total})')
     sub_categories[category] = sub_categories_with_totals
 
+def quantize_bmi(bmi):
+    if bmi < 22:
+        return 18
+    elif 22 < bmi < 26:
+        return 22
+    elif 22 < bmi < 26:
+        return 22
+    elif 26 < bmi < 30:
+        return 26
+    elif 30 < bmi < 34:
+        return 30
+    elif 34 < bmi < 41:
+        return 34
+    elif 41 < bmi:
+        return 41
 
 def plot_categories():
     df = pd.read_csv(CAT_DIR)
     df['label'] = df.apply(lambda x: ahi_to_label(x[RAW_LABEL_COL]), axis=1)
-    df['bmi'] = df.apply(lambda x: 10 * np.round(x['bmi_s1'] / 10), axis=1).dropna()
+    df['bmi'] = df.apply(lambda x: quantize_bmi(x['bmi_s1']), axis=1).dropna()
     for category in CATEGORIES:
         x_axis = np.arange(len(df[category].dropna().unique()))
         no, mild, moderate, severe, totals = get_label_distr(df, category)
