@@ -5,7 +5,7 @@ import pandas as pd
 import sys
 
 SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
-CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
+CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv/'
 
 
 def ahi_to_label(ahi):
@@ -84,10 +84,10 @@ def compute_and_save_dft(dir_path):
     x_train = pd.read_csv(dir_path + 'x_train.csv')
     x_train_fft = np.fft.rfft(x_train, axis=-1)
     x_train_fft_norm = np.abs(x_train_fft) ** 2
-    x_train_fft_tensor = np.concatenate((x_train_fft.real, x_train_fft.img),
-                                        axis=2)  # should be tensor of shape (x,x,2)
-    x_train_fft_norm.to_csv(dir_path + 'x_train_fft_norm.csv')
-    x_train_fft_tensor.to_csv(dir_path + 'x_train_fft_tensor')
+    x_train_fft_tensor = np.array((x_train_fft.real, x_train_fft.imag))  # should be tensor of shape (x,x,2)
+    pd.DataFrame(x_train_fft_norm).to_csv(dir_path + 'x_train_fft_norm.csv')
+    pd.DataFrame(x_train_fft.real).to_csv(dir_path + 'x_train_fft_real.csv')
+    pd.DataFrame(x_train_fft.imag).to_csv(dir_path + 'x_train_fft_imag.csv')
 
 
 if __name__ == '__main__':

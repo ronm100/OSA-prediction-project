@@ -11,10 +11,10 @@ from sklearn.model_selection import train_test_split
 import sys
 # from keras import backend as K
 
-MODEL_NAME = '128_units_gru_concat_before_dense'
+MODEL_NAME = '2_LSTMs_Size_128_each'
 # LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
 # CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
-LOG_DIR = './logs/' + MODEL_NAME
+LOG_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/logs/' + MODEL_NAME
 CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
 def ahi_to_label(ahi):
     if ahi < 5:
@@ -45,20 +45,32 @@ def make_model(input_shape):
     num_classes = 4
     input_layer = keras.layers.Input(input_shape)
 
-    conv_gru1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same", dilation_rate=2)(input_layer)
-    conv_gru1 = keras.layers.BatchNormalization()(conv_gru1)
-    conv_gru1 = keras.layers.ReLU()(conv_gru1)
-    conv_gru1 = keras.layers.AveragePooling1D(2, padding='same')(conv_gru1)
-    conv_gru1 = keras.layers.Dropout(0.1)(conv_gru1)
+    conv_lstm1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same", dilation_rate=2)(input_layer)
+    conv_lstm1 = keras.layers.BatchNormalization()(conv_lstm1)
+    conv_lstm1 = keras.layers.ReLU()(conv_lstm1)
+    conv_lstm1 = keras.layers.AveragePooling1D(2, padding='same')(conv_lstm1)
+    conv_lstm1 = keras.layers.Dropout(0.3)(conv_lstm1)
 
-    conv_gru2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv_gru1)
-    conv_gru2 = keras.layers.BatchNormalization()(conv_gru2)
-    conv_gru2 = keras.layers.ReLU()(conv_gru2)
-    conv_gru2 = keras.layers.MaxPooling1D(2, padding='same')(conv_gru2)
+    conv_lstm2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv_lstm1)
+    conv_lstm2 = keras.layers.BatchNormalization()(conv_lstm2)
+    conv_lstm2 = keras.layers.ReLU()(conv_lstm2)
+    conv_lstm2 = keras.layers.MaxPooling1D(2, padding='same')(conv_lstm2)
 
-    gru = keras.layers.GRU(128)(conv_gru2)
-    # gru = keras.layers.Dense(num_classes, activation="softmax")(gru)
-    # gru = keras.layers.BatchNormalization()(gru)
+    lstm_1 = keras.layers.LSTM(128)(conv_lstm2)
+    lstm_1 = keras.layers.Reshape((128, -1))(lstm_1)
+    
+    conv_lstm3 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same", dilation_rate=2)(lstm_1)
+    conv_lstm3 = keras.layers.BatchNormalization()(conv_lstm3)
+    conv_lstm3 = keras.layers.ReLU()(conv_lstm3)
+    conv_lstm3 = keras.layers.AveragePooling1D(2, padding='same')(conv_lstm3)
+    conv_lstm3 = keras.layers.Dropout(0.3)(conv_lstm3)
+
+    conv_lstm4 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv_lstm3)
+    conv_lstm4 = keras.layers.BatchNormalization()(conv_lstm4)
+    conv_lstm4 = keras.layers.ReLU()(conv_lstm4)
+    conv_lstm4 = keras.layers.MaxPooling1D(2, padding='same')(conv_lstm4)
+
+    lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
 
     conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="causal", dilation_rate=2)(input_layer)
     conv1 = keras.layers.BatchNormalization()(conv1)
@@ -113,7 +125,7 @@ def make_model(input_shape):
     gap = keras.layers.GlobalAveragePooling1D()(conv8)
     # cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
 
-    concatted = keras.layers.Concatenate()([gap, gru])
+    concatted = keras.layers.Concatenate()([gap, lstm_2])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
