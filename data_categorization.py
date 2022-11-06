@@ -99,6 +99,19 @@ def plot_categories():
         plt.legend()
         plt.show()
 
+def plot_label_distribution():
+    df = pd.read_csv(CAT_DIR)
+    labels = df.apply(lambda x: ahi_to_label(x[RAW_LABEL_COL]), axis=1)
+    label_counts = labels.value_counts(normalize=True)
+
+    x_axis = ['Healthy', 'Mild', 'Moderate', 'Severe']
+    plt.bar(x_axis, label_counts, 0.1)
+    plt.xlabel('OSA severity')
+    plt.ylabel("% of subjects")
+    plt.title(f'OSA severity distribution (Total: {len(df)})')
+    plt.show()
+
 
 if __name__ == '__main__':
-    plot_categories()
+    # plot_categories()
+    plot_label_distribution()
