@@ -8,12 +8,17 @@ import pandas as pd
 from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 from sklearn.model_selection import train_test_split
+# from scipy.signal import stft
+from librosa import stft
 import sys
 # from keras import backend as K
 
-MODEL_NAME = 'data_test_10'
-LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
-CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
+
+n_fft = 128  # number of stft rows, should be a power of 2
+window_length = 16  # lower number -> better time resolution
+MODEL_NAME = f'stft_{n_fft}_{window_length}'
+LOG_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/logs/' + MODEL_NAME
+CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -38,58 +43,40 @@ def edf_get_oximetry(edf_path):
     signal = np.array(position).astype(float)
     return signal
 
+def apply_stft(x_train, x_val, n_fft, win_length):
+    train_stft, val_stft = list(), list()
+    for train_sample in x_train:
+        train_sample = train_sample.reshape(train_sample.shape[0], )
+        train_stft.append(abs(stft(train_sample, n_fft=n_fft, win_length=win_length)))
+
+    for val_sample in x_val:
+        val_sample = val_sample.reshape(val_sample.shape[0], )
+        val_stft.append(abs(stft(val_sample, n_fft=n_fft, win_length=win_length)))
+
+    return np.expand_dims(np.array(train_stft), axis=3), np.expand_dims(np.array(val_stft), axis=3)
+
+def conv2d_block(input_layer, filters, kernel_size, pooling = 'max'):
+    conv = keras.layers.Conv2D(filters=filters, kernel_size=kernel_size, activation='relu')(input_layer)
+    conv = keras.layers.BatchNormalization()(conv)
+    conv = keras.layers.AveragePooling2D()(conv) if pooling == 'avg' else keras.layers.MaxPooling2D()(conv)
+    conv = keras.layers.Dropout(0.2)(conv)
+
+    return conv
 
 def make_model(input_shape):
     num_classes = 4
     input_layer = keras.layers.Input(input_shape)
 
-    conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="causal", dilation_rate=2)(input_layer)
-    conv1 = keras.layers.BatchNormalization()(conv1)
-    conv1 = keras.layers.ReLU()(conv1)
-    conv1 = keras.layers.AveragePooling1D(2, padding='same')(conv1)
-    conv1 = keras.layers.Dropout(0.1)(conv1)
+    conv_1 = conv2d_block(filters=4, kernel_size=(3,1), pooling='avg', input_layer=input_layer)
+    conv_2 = conv2d_block(filters=8, kernel_size=(3,1), input_layer=conv_1)
+    conv_3 = conv2d_block(filters=16, kernel_size=(3,2), input_layer=conv_2)
+    conv_4 = conv2d_block(filters=32, kernel_size=(3,2), input_layer=conv_3)
+    conv_5 = conv2d_block(filters=64, kernel_size=(3,2), input_layer=conv_4)
+    conv_6 = conv2d_block(filters=128, kernel_size=(3,2), input_layer=conv_5)
+    conv_7 = conv2d_block(filters=256, kernel_size=(3,2), input_layer=conv_6)
 
-    conv2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv1)
-    conv2 = keras.layers.BatchNormalization()(conv2)
-    conv2 = keras.layers.ReLU()(conv2)
-    conv2 = keras.layers.MaxPooling1D(2, padding='same')(conv2)
-    conv2 = keras.layers.Dropout(0.15)(conv2)
 
-    conv3= keras.layers.Conv1D(filters=128, kernel_size=3, padding='same')(conv2)
-    # conv3 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="valid")(conv2)
-    conv3 = keras.layers.BatchNormalization()(conv3)
-    conv3 = keras.layers.ReLU()(conv3)
-    conv3 = keras.layers.MaxPooling1D(2, padding='same')(conv3)
-    conv3 = keras.layers.Dropout(0.2)(conv3)
-
-    conv4 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv3)
-    conv4 = keras.layers.BatchNormalization()(conv4)
-    conv4 = keras.layers.ReLU()(conv4)
-    conv4 = keras.layers.MaxPooling1D(2, padding='same')(conv4)
-    conv4 = keras.layers.Dropout(0.2)(conv4)
-
-    conv5 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv4)
-    conv5 = keras.layers.BatchNormalization()(conv5)
-    conv5 = keras.layers.ReLU()(conv5)
-    conv5 = keras.layers.MaxPooling1D(2, padding='same')(conv5)
-    conv5 = keras.layers.Dropout(0.2)(conv5)
-
-    conv6 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv5)
-    conv6 = keras.layers.BatchNormalization()(conv6)
-    conv6 = keras.layers.ReLU()(conv6)
-    conv6 = keras.layers.MaxPooling1D(2, padding='same')(conv6)
-
-    conv7 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv6)
-    conv7 = keras.layers.BatchNormalization()(conv7)
-    conv7 = keras.layers.ReLU()(conv7)
-    conv7 = keras.layers.MaxPooling1D(2, padding='same')(conv7)
-
-    conv8 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv7)
-    conv8 = keras.layers.BatchNormalization()(conv8)
-    conv8 = keras.layers.ReLU()(conv8)
-    conv8 = keras.layers.MaxPooling1D(2, padding='same')(conv8)
-
-    gap = keras.layers.GlobalAveragePooling1D()(conv8)
+    gap = keras.layers.GlobalAveragePooling2D()(conv_7)
 
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(gap)
 
@@ -97,24 +84,32 @@ def make_model(input_shape):
 
 
 if __name__ == '__main__':
+    # Parameters:
+    sample_length = 21600
+    num_of_samples = 5755
 
-    semple_length = 21600
-    num_of_semples = 5755
+    
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
     x_train = []
     y_train = []
     x_test = []
     y_test = []
-    x = pd.read_csv(CSV_DIR + '/' + 'x_train.csv', nrows = num_of_semples)
+    x = pd.read_csv(CSV_DIR + '/' + 'x_train.csv', nrows = num_of_samples)
     x = np.array(x)
     x = x[:,0:21600]
     x = x.reshape((x.shape[0], x.shape[1], 1))
-    y = pd.read_csv(CSV_DIR + '/' + 'y_train.csv', nrows = num_of_semples)
-    y = np.array(y)[0:num_of_semples,1]
-    y = y.reshape(num_of_semples, -1)
+    y = pd.read_csv(CSV_DIR + '/' + 'y_train.csv', nrows = num_of_samples)
+    y = np.array(y)[0:num_of_samples,1]
+    y = y.reshape(num_of_samples, -1)
+    
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.20, random_state = 42)
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.25, random_state = 21)
+
+    x_train, x_val = apply_stft(x_train, x_val, n_fft, window_length)
+    print('STFT done \n')
+    print(f'shape: {x_train.shape}')
+    
     model = make_model(input_shape=x_train.shape[1:])
     keras.utils.plot_model(model, to_file = LOG_DIR + '/' + MODEL_NAME+ "_architecture.png", show_shapes=True)
     epochs = 1000
@@ -203,6 +198,8 @@ if __name__ == '__main__':
         file.write('recall_1 score is: ' + str(recall_1) + '\n')
         file.write('recall_2 score is: ' + str(recall_2) + '\n')
         file.write('recall_3 score is: ' + str(recall_3) + '\n')
+        file.write('stft n_fft is: ' + str(n_fft) + '\n')
+        file.write('stft window length is: ' + str(window_length) + '\n')
 
 
     pd.DataFrame(confusion_m).to_csv(LOG_DIR + '/' + MODEL_NAME + '_confusion_matrix.csv')
