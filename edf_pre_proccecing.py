@@ -3,9 +3,36 @@ import numpy as np
 import os
 import pandas as pd
 import sys
+from librosa import stft
+import pickle
+from pathlib import Path
+from sklearn.model_selection import train_test_split
 
 SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
-CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv/'
+CSV_DIR = Path('../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv')
+STFT_DIR = CSV_DIR.joinpath(Path('stft'))
+
+num_of_samples = 5755
+
+
+def apply_stft(x_train, x_val, n_fft, win_length):
+    train_stft, val_stft = list(), list()
+    i = 0
+    # t_1, t_2 = time.time(), time.time()
+    for train_sample in x_train:
+        train_sample = train_sample.reshape(train_sample.shape[0], )
+        train_stft.append(abs(stft(train_sample, n_fft=n_fft, win_length=win_length)))
+        # i += 1
+        # t_2 = t_1
+        # t_1 = time.time()
+        # if i % 200 != 0:
+        #     print(f'time_delta: {t_1 - t_2}, i / 200 = {i / 200}')
+
+    for val_sample in x_val:
+        val_sample = val_sample.reshape(val_sample.shape[0], )
+        val_stft.append(abs(stft(val_sample, n_fft=n_fft, win_length=win_length)))
+
+    return np.expand_dims(np.array(train_stft), axis=3), np.expand_dims(np.array(val_stft), axis=3)
 
 
 def ahi_to_label(ahi):
@@ -90,5 +117,34 @@ def compute_and_save_dft(dir_path):
     pd.DataFrame(x_train_fft.imag).to_csv(dir_path + 'x_train_fft_imag.csv')
 
 
+def compute_and_save_stft(dir_path, n_fft, window_length):
+    x = pd.read_csv(dir_path + 'x_train.csv')
+    y = pd.read_csv(dir_path + '/' + 'y_train.csv', nrows=num_of_samples)
+    y = np.array(y)[0:num_of_samples, 1]
+    y = y.reshape(num_of_samples, -1)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.20, random_state=42)
+    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.25, random_state=21)
+    x_train_stft, x_val_stft = apply_stft(x_train, x_val, n_fft, window_length)
+
+    # Save data:
+    new_dir = dir_path.joinpath(Path(f'stft_{n_fft}_{window_length}'))
+    x_t_path = new_dir.joinpath(Path('x_t'))
+    x_v_path = new_dir.joinpath(Path('x_v'))
+    y_t_path = new_dir.joinpath(Path('y_t'))
+    y_v_path = new_dir.joinpath(Path('y_v'))
+    if not Path.exists(new_dir):
+        Path.makedir(new_dir)
+
+    with open(x_t_path, 'wb') as x_t_file:
+        pickle.dump(x_train_stft, x_t_file)
+    with open(x_v_path, 'wb') as x_v_file:
+        pickle.dump(x_val_stft, x_v_file)
+    with open(y_t_path, 'wb') as y_t_file:
+        pickle.dump(y_train, y_t_file)
+    with open(y_v_path, 'wb') as y_v_file:
+        pickle.dump(y_test, y_v_file)
+
 if __name__ == '__main__':
-    compute_and_save_dft(CSV_DIR)
+    stft_pairs = [(128, 16), (128, 8), (256, 16), (256, 8), (512, 8)]
+    for n_fft, window_length in stft_pairs:
+        compute_and_save_stft(STFT_DIR, n_fft, window_length)
