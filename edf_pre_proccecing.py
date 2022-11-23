@@ -118,8 +118,8 @@ def compute_and_save_dft(dir_path):
 
 
 def compute_and_save_stft(dir_path, n_fft, window_length):
-    x = pd.read_csv(dir_path + 'x_train.csv')
-    y = pd.read_csv(dir_path + '/' + 'y_train.csv', nrows=num_of_samples)
+    x = pd.read_csv(dir_path.joinpath('x_train.csv'))
+    y = pd.read_csv(dir_path.joinpath('y_train.csv'), nrows=num_of_samples)
     y = np.array(y)[0:num_of_samples, 1]
     y = y.reshape(num_of_samples, -1)
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.20, random_state=42)
@@ -127,6 +127,7 @@ def compute_and_save_stft(dir_path, n_fft, window_length):
     x_train_stft, x_val_stft = apply_stft(x_train, x_val, n_fft, window_length)
 
     # Save data:
+    dir_path = dir_path.joinpath(Path('stft'))
     new_dir = dir_path.joinpath(Path(f'stft_{n_fft}_{window_length}'))
     x_t_path = new_dir.joinpath(Path('x_t'))
     x_v_path = new_dir.joinpath(Path('x_v'))
@@ -147,4 +148,5 @@ def compute_and_save_stft(dir_path, n_fft, window_length):
 if __name__ == '__main__':
     stft_pairs = [(128, 16), (128, 8), (256, 16), (256, 8), (512, 8)]
     for n_fft, window_length in stft_pairs:
-        compute_and_save_stft(STFT_DIR, n_fft, window_length)
+        compute_and_save_stft(CSV_DIR, n_fft, window_length)
+        print(f'{n_fft}, {window_length} finished')
