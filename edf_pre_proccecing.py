@@ -8,8 +8,9 @@ import pickle
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 
+ROOT = Path('../../../../..')
 SIGNAL_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/edf'
-CSV_DIR = Path('../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv')
+CSV_DIR = ROOT.joinpath(Path('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'))
 STFT_DIR = CSV_DIR.joinpath(Path('stft'))
 
 num_of_samples = 5755
@@ -119,6 +120,9 @@ def compute_and_save_dft(dir_path):
 
 def compute_and_save_stft(dir_path, n_fft, window_length):
     x = pd.read_csv(dir_path.joinpath('x_train.csv'))
+    x = np.array(x)
+    x = x[:, 0:21600]
+    x = x.reshape((x.shape[0], x.shape[1], 1))
     y = pd.read_csv(dir_path.joinpath('y_train.csv'), nrows=num_of_samples)
     y = np.array(y)[0:num_of_samples, 1]
     y = y.reshape(num_of_samples, -1)
@@ -134,19 +138,21 @@ def compute_and_save_stft(dir_path, n_fft, window_length):
     y_t_path = new_dir.joinpath(Path('y_t'))
     y_v_path = new_dir.joinpath(Path('y_v'))
     if not Path.exists(new_dir):
-        Path.makedir(new_dir)
+        Path.mkdir(new_dir)
 
+    print(f'stft shape = {x_train_stft.shape}')
     with open(x_t_path, 'wb') as x_t_file:
-        pickle.dump(x_train_stft, x_t_file)
+        np.save(x_t_file, x_train_stft)
     with open(x_v_path, 'wb') as x_v_file:
-        pickle.dump(x_val_stft, x_v_file)
+        np.save(x_v_file, x_val_stft)
     with open(y_t_path, 'wb') as y_t_file:
-        pickle.dump(y_train, y_t_file)
+        np.save(y_t_file, y_train)
     with open(y_v_path, 'wb') as y_v_file:
-        pickle.dump(y_test, y_v_file)
+        np.save(y_v_file, y_test)
 
 if __name__ == '__main__':
-    stft_pairs = [(128, 16), (128, 8), (256, 16), (256, 8), (512, 8)]
+    # stft_pairs = [(128, 16), (128, 8), (256, 16), (256, 8), (512, 8)]
+    stft_pairs = [(128, 128), (128, 64), (64, 50), (64, 32), (64, 8),]
     for n_fft, window_length in stft_pairs:
         compute_and_save_stft(CSV_DIR, n_fft, window_length)
         print(f'{n_fft}, {window_length} finished')

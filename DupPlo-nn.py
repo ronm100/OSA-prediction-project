@@ -5,17 +5,18 @@ import os
 from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 from pydot import *
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 from sklearn.model_selection import train_test_split
 import sys
 # from keras import backend as K
 
-MODEL_NAME = '2_LSTMs_Size_128_each'
-# LOG_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/' + MODEL_NAME
+# log_dir = '../../../../databases/aviv.ish@staff.technion.ac.il/' + model_name
 # CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
-LOG_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/logs/' + MODEL_NAME
-CSV_DIR = '../../../../databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv'
+ROOT = Path('../../../../..')
+
+STFT_DIR = ROOT.joinpath(Path('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv/stft'))
 def ahi_to_label(ahi):
     if ahi < 5:
         return 0
@@ -130,34 +131,36 @@ def make_model(input_shape):
 
     return keras.models.Model(inputs=input_layer, outputs=output_layer)
 
+def get_training_data(data_dir: Path):
+    sample_length = 21600
+    num_of_samples = 5755
+    # x = np.array(pd.read_csv(data_dir.joinpath('x_t'), nrows = num_of_samples))[:,0:21600]
+    x_t = np.load(data_dir.joinpath('x_t'))
+    x_v = np.load(data_dir.joinpath('x_v'))
+    y_t = np.load(data_dir.joinpath('y_t'))
+    y_v = np.load(data_dir.joinpath('y_v'))
+    # x = x.reshape((x.shape[0], x.shape[1], 1))
+    # y = np.array(pd.read_csv(data_dir.joinpath('y_t'), nrows = num_of_samples))[0:num_of_samples,1]
+    # y = np.array(pd.read_csv(data_dir.joinpath('y_train.csv'), nrows = num_of_samples))[0:num_of_samples,1]
+    # y = y.reshape(num_of_samples, -1)
+    
+    return x_t, x_v, y_t, y_v
 
-if __name__ == '__main__':
 
-    semple_length = 21600
-    num_of_semples = 5755
-    if not os.path.exists(LOG_DIR):
-        os.makedirs(LOG_DIR)
+def train_model(x_train, x_val, y_train, y_val):
+    log_dir = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/logs/duplo_on_stft1/' + model_name)
+    if os.path.exists(log_dir):
+        raise ValueError('Trying to overrun existing model results')
+    os.makedirs(log_dir)
     # else:
-    #     print("files already exists, please delete the" + MODEL_NAME + "directory and try again")
+    #     print("files already exists, please delete the" + model_name + "directory and try again")
     #     sys.exit()
-    x_train = []
-    y_train = []
-    x_test = []
-    y_test = []
-    x = pd.read_csv(CSV_DIR + '/' + 'x_train.csv', nrows = num_of_semples)
-    x = np.array(x)
-    x = x[:,0:21600]
-    x = x.reshape((x.shape[0], x.shape[1], 1))
-    y = pd.read_csv(CSV_DIR + '/' + 'y_train.csv', nrows = num_of_semples)
-    y = np.array(y)[0:num_of_semples,1]
-    y = y.reshape(num_of_semples, -1)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.20, random_state = 42)
-    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.25, random_state = 21)
+
     model = make_model(input_shape=x_train.shape[1:])
-    keras.utils.plot_model(model, to_file = LOG_DIR + '/' + MODEL_NAME+ "_architecture.png", show_shapes=True)
+    keras.utils.plot_model(model, to_file = log_dir + '/' + model_name+ "_architecture.png", show_shapes=True)
     epochs = 1000
     batch_size = 32
-    callbacks = [keras.callbacks.ModelCheckpoint(LOG_DIR + '/' + MODEL_NAME + "_best_model.h5", save_best_only=True, monitor="val_loss"),
+    callbacks = [keras.callbacks.ModelCheckpoint(log_dir + '/' + model_name + "_best_model.h5", save_best_only=True, monitor="val_loss"),
                  keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.00001),
                  keras.callbacks.EarlyStopping(monitor="val_loss", patience=18, verbose=1),]
 
@@ -211,7 +214,7 @@ if __name__ == '__main__':
     plt.ylabel(metric, fontsize="large")
     plt.xlabel("epoch", fontsize="large")
     plt.legend(["train", "val"], loc="best")
-    plt.savefig(LOG_DIR + '/' + metric + '_figure.png')
+    plt.savefig(log_dir + '/' + metric + '_figure.png')
     plt.close()
 
     metric = "loss"
@@ -222,13 +225,13 @@ if __name__ == '__main__':
     plt.ylabel(metric, fontsize="large")
     plt.xlabel("epoch", fontsize="large")
     plt.legend(["train", "val"], loc="best")
-    plt.savefig(LOG_DIR + '/' + metric + '_figure.png')
+    plt.savefig(log_dir + '/' + metric + '_figure.png')
     plt.close()
 
 
 
-    with open(LOG_DIR + '/' + MODEL_NAME + '_matrics_log.txt', 'w+') as file:
-        file.write(MODEL_NAME + '\n')
+    with open(log_dir + '/' + model_name + '_matrics_log.txt', 'w+') as file:
+        file.write(model_name + '\n')
         file.write('f1 score is: ' + str(f1) + '\n')
         file.write('roc_auc_score is: ' + str(auc_score) + '\n')
         file.write('accuracy score is: ' + str(acc) + '\n')
@@ -243,5 +246,12 @@ if __name__ == '__main__':
         file.write('recall_3 score is: ' + str(recall_3) + '\n')
 
 
-    pd.DataFrame(confusion_m).to_csv(LOG_DIR + '/' + MODEL_NAME + '_confusion_matrix.csv')
-
+    pd.DataFrame(confusion_m).to_csv(log_dir + '/' + model_name + '_confusion_matrix.csv')
+    
+if __name__ == '__main__':
+    stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
+    for n_fft, win_len in stfts:
+        model_name = f'stft_{n_fft}_{win_len}'
+        data_dir = STFT_DIR.joinpath(model_name)
+        x_train, x_val, y_train, y_val = get_training_data(data_dir)
+        train_model(x_train, x_val, y_train, y_val)
