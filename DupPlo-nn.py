@@ -28,7 +28,7 @@ def conv1d_block(input_layer, filters, kernel_size, pooling='max', padding='same
     conv = keras.layers.Conv1D(filters=filters, kernel_size=kernel_size, padding=padding, dilation_rate=2)(input_layer)
     conv = keras.layers.BatchNormalization()(conv)
     conv = keras.layers.ReLU()(conv)
-    conv = keras.layers.AveragePooling1D(2, padding='same')(conv) if pooling == 'avg' else keras.MaxPooling1D(2, padding='same')(conv)
+    conv = keras.layers.AveragePooling1D(2, padding='same')(conv) if pooling == 'avg' else keras.layers.MaxPooling1D(2, padding='same')(conv)
     conv = keras.layers.Dropout(0.2)(conv)
     return conv
 
@@ -79,10 +79,10 @@ def get_training_val_data(stft_name: str):
     num_of_samples = 5755
     stft_input_dir = STFT_DIR.joinpath(stft_name)
 
-    x = np.array(pd.read_csv(CSV_DIR.joinpath('x_train.csv'), nrows = num_of_samples))[:, 0:sample_length].reshape((x.shape[0], x.shape[1], 1))
-    y = np.array(pd.read_csv(CSV_DIR.joinpath('y_train.csv'), nrows = num_of_samples))[0:num_of_samples,1].reshape(num_of_samples, -1)
-    # x = x.reshape((x.shape[0], x.shape[1], 1))
-    # y = y.reshape(num_of_samples, -1)
+    x = np.array(pd.read_csv(CSV_DIR.joinpath('x_train.csv'), nrows = num_of_samples))[:, 0:sample_length]
+    y = np.array(pd.read_csv(CSV_DIR.joinpath('y_train.csv'), nrows = num_of_samples))[0:num_of_samples,1]
+    x = x.reshape((x.shape[0], x.shape[1], 1))
+    y = y.reshape(num_of_samples, -1)
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.20, random_state = 42)
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.25, random_state = 21)
 
@@ -183,7 +183,8 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, override_l
         file.write('recall_3 score is: ' + str(recall_3) + '\n')
     
 if __name__ == '__main__':
-    stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
+    # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
+    stfts = [(128, 128)]
     model_name = '3_branches_1st_try'
     for n_fft, win_len in stfts:
         stft_name = f'stft_{n_fft}_{win_len}'
