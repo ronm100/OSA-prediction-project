@@ -12,11 +12,10 @@ from sklearn.model_selection import train_test_split
 import sys
 # from keras import backend as K
 
-# log_dir = '../../../../databases/aviv.ish@staff.technion.ac.il/' + model_name
-# CSV_DIR = '../../../../databases/aviv.ish@staff.technion.ac.il/processed_data_as_csv'
 ROOT = Path('../../../../..')
-
-STFT_DIR = ROOT.joinpath(Path('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv/stft'))
+LOG_BASE_DIR = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/logs')
+CSV_DIR = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv')
+STFT_DIR = CSV_DIR.joinpath('stft')
 
 def conv2d_block(input_layer, filters, kernel_size, pooling='max', padding='valid'):
     conv = keras.layers.Conv2D(filters=filters, kernel_size=kernel_size, activation='relu', padding=padding)(input_layer)
@@ -73,49 +72,54 @@ def make_model(orig_input_shape, stft_input_shape):
     concatted = keras.layers.Concatenate()([duplo_gap, stft_gap, lstm_2])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
-    return keras.models.Model(inputs=orig_input_layer, outputs=output_layer)
+    return keras.models.Model(inputs=[orig_input_layer, stft_input_layer], outputs=output_layer)
 
-def get_training_data(data_dir: Path):
+def get_training_val_data(stft_name: str):
     sample_length = 21600
     num_of_samples = 5755
-    # x = np.array(pd.read_csv(data_dir.joinpath('x_t'), nrows = num_of_samples))[:,0:21600]
-    x_t = np.load(data_dir.joinpath('x_t'))
-    x_v = np.load(data_dir.joinpath('x_v'))
-    y_t = np.load(data_dir.joinpath('y_t'))
-    y_v = np.load(data_dir.joinpath('y_v'))
+    stft_input_dir = STFT_DIR.joinpath(stft_name)
+
+    x = np.array(pd.read_csv(CSV_DIR.joinpath('x_train.csv'), nrows = num_of_samples))[:, 0:sample_length].reshape((x.shape[0], x.shape[1], 1))
+    y = np.array(pd.read_csv(CSV_DIR.joinpath('y_train.csv'), nrows = num_of_samples))[0:num_of_samples,1].reshape(num_of_samples, -1)
     # x = x.reshape((x.shape[0], x.shape[1], 1))
-    # y = np.array(pd.read_csv(data_dir.joinpath('y_t'), nrows = num_of_samples))[0:num_of_samples,1]
-    # y = np.array(pd.read_csv(data_dir.joinpath('y_train.csv'), nrows = num_of_samples))[0:num_of_samples,1]
     # y = y.reshape(num_of_samples, -1)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.20, random_state = 42)
+    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.25, random_state = 21)
+
+    stft_train = np.load(stft_input_dir.joinpath('x_t'))
+    stft_val = np.load(stft_input_dir.joinpath('x_v'))
     
-    return x_t, x_v, y_t, y_v
+    return x_train, x_val, stft_train, stft_val, y_train, y_val
 
 
-def train_model(x_train, x_val, y_train, y_val):
-    log_dir = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/logs/duplo_on_stft1/' + model_name)
+def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, override_logs = False):
+    log_dir = LOG_BASE_DIR.joinpath(model_name).joinpath(stft_name)
     if os.path.exists(log_dir):
-        raise ValueError('Trying to overrun existing model results')
-    os.makedirs(log_dir)
-    # else:
-    #     print("files already exists, please delete the" + model_name + "directory and try again")
-    #     sys.exit()
+        if not override_logs:
+            raise ValueError('Trying to overrun existing model results')
+        else:
+            print(f'Overriding {log_dir}')
+    else:
+        os.makedirs(log_dir)
 
-    model = make_model(input_shape=x_train.shape[1:])
-    keras.utils.plot_model(model, to_file = log_dir + '/' + model_name+ "_architecture.png", show_shapes=True)
+    training_inputs = [x_train, stft_train]
+    validation_inputs = [x_val, stft_val]
+    model = make_model(orig_input_shape=x_train.shape[1:], stft_input_shape=stft_train.shape[1:])
+    keras.utils.plot_model(model, to_file = log_dir.joinpath("architecture.png"), show_shapes=True)
     epochs = 1000
     batch_size = 32
-    callbacks = [keras.callbacks.ModelCheckpoint(log_dir + '/' + model_name + "_best_model.h5", save_best_only=True, monitor="val_loss"),
+    callbacks = [keras.callbacks.ModelCheckpoint(log_dir.joinpath("best_model.h5"), save_best_only=True, monitor="val_loss"),
                  keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.00001),
                  keras.callbacks.EarlyStopping(monitor="val_loss", patience=18, verbose=1),]
 
     model.compile (optimizer="adam",loss="sparse_categorical_crossentropy",
                    metrics=['sparse_categorical_accuracy'])
 
-    history = model.fit (x_train, y_train, batch_size=batch_size, epochs=epochs,
-                        callbacks=callbacks, validation_data=(x_val, y_val), verbose=1,)
+    history = model.fit (training_inputs, y_train, batch_size=batch_size, epochs=epochs,
+                        callbacks=callbacks, validation_data=(validation_inputs, y_val), verbose=1,)
 
     # loss, accuracy, f1_score, precision, recall = model.evaluate(x_train, y_train, verbose=0)
-    y_pred_probs = model.predict(x_val)
+    y_pred_probs = model.predict(validation_inputs)
     y_pred = np.argmax(y_pred_probs, axis=1)
     f1 = "%.3f" % f1_score(y_val, y_pred, average='macro')
     (f1_0,f1_1,f1_2, f1_3) = f1_score(y_val, y_pred, average=None)
@@ -149,33 +153,22 @@ def train_model(x_train, x_val, y_train, y_val):
     print(f'recall_3 score is: {recall_3}')
 
 
-
-    metric = "sparse_categorical_accuracy"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.savefig(log_dir + '/' + metric + '_figure.png')
-    plt.close()
-
-    metric = "loss"
-    plt.figure()
-    plt.plot(history.history[metric])
-    plt.plot(history.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.savefig(log_dir + '/' + metric + '_figure.png')
-    plt.close()
+    for metric in ["sparse_categorical_accuracy", "loss"]:
+        plt.figure()
+        plt.plot(history.history[metric])
+        plt.plot(history.history["val_" + metric])
+        plt.title("model " + metric)
+        plt.ylabel(metric, fontsize="large")
+        plt.xlabel("epoch", fontsize="large")
+        plt.legend(["train", "val"], loc="best")
+        plt.savefig(log_dir.joinpath(metric + '_figure.png'))
+        plt.close()
 
 
 
-    with open(log_dir + '/' + model_name + '_matrics_log.txt', 'w+') as file:
-        file.write(model_name + '\n')
+
+    with open(log_dir.joinpath('metrics_log.txt'), 'w+') as file:
+        file.write(model_name + stft_name + '\n')
         file.write('f1 score is: ' + str(f1) + '\n')
         file.write('roc_auc_score is: ' + str(auc_score) + '\n')
         file.write('accuracy score is: ' + str(acc) + '\n')
@@ -188,14 +181,11 @@ def train_model(x_train, x_val, y_train, y_val):
         file.write('recall_1 score is: ' + str(recall_1) + '\n')
         file.write('recall_2 score is: ' + str(recall_2) + '\n')
         file.write('recall_3 score is: ' + str(recall_3) + '\n')
-
-
-    pd.DataFrame(confusion_m).to_csv(log_dir + '/' + model_name + '_confusion_matrix.csv')
     
 if __name__ == '__main__':
     stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
+    model_name = '3_branches_1st_try'
     for n_fft, win_len in stfts:
-        model_name = f'stft_{n_fft}_{win_len}'
-        data_dir = STFT_DIR.joinpath(model_name)
-        x_train, x_val, y_train, y_val = get_training_data(data_dir)
-        train_model(x_train, x_val, y_train, y_val)
+        stft_name = f'stft_{n_fft}_{win_len}'
+        x_train, x_val, stft_train, stft_val, y_train, y_val = get_training_val_data(stft_name)
+        train_model(x_train, x_val, stft_train, stft_val, y_train, y_val)
