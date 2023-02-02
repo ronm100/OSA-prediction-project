@@ -17,119 +17,63 @@ import sys
 ROOT = Path('../../../../..')
 
 STFT_DIR = ROOT.joinpath(Path('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv/stft'))
-def ahi_to_label(ahi):
-    if ahi < 5:
-        return 0
-    elif ahi < 15:
-        return 1
-    elif ahi < 30:
-        return 2
-    else:
-        return 3
 
+def conv2d_block(input_layer, filters, kernel_size, pooling='max', padding='valid'):
+    conv = keras.layers.Conv2D(filters=filters, kernel_size=kernel_size, activation='relu', padding=padding)(input_layer)
+    conv = keras.layers.BatchNormalization()(conv)
+    conv = keras.layers.AveragePooling2D()(conv) if pooling == 'avg' else keras.layers.MaxPooling2D()(conv)
+    conv = keras.layers.Dropout(0.2)(conv)
+    return conv
 
-def get_labels(path):
-    data = pd.read_csv(path)
-    ahi = data['ahi_a0h3a']
-    return list(map(ahi_to_label, ahi))
+def conv1d_block(input_layer, filters, kernel_size, pooling='max', padding='same'):
+    conv = keras.layers.Conv1D(filters=filters, kernel_size=kernel_size, padding=padding, dilation_rate=2)(input_layer)
+    conv = keras.layers.BatchNormalization()(conv)
+    conv = keras.layers.ReLU()(conv)
+    conv = keras.layers.AveragePooling1D(2, padding='same')(conv) if pooling == 'avg' else keras.MaxPooling1D(2, padding='same')(conv)
+    conv = keras.layers.Dropout(0.2)(conv)
+    return conv
 
-
-def edf_get_oximetry(edf_path):
-    edf = pyedflib.EdfReader(edf_path)
-    i_position = np.where(np.array(edf.getSignalLabels()) == 'SaO2')[0][0]
-    position = edf.readSignal(i_position)
-    signal = np.array(position).astype(float)
-    return signal
-
-
-def make_model(input_shape):
+def make_model(orig_input_shape, stft_input_shape):
     num_classes = 4
-    input_layer = keras.layers.Input(input_shape)
+    orig_input_layer = keras.layers.Input(orig_input_shape)
+    stft_input_layer = keras.layers.Input(stft_input_shape)
 
-    conv_lstm1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same", dilation_rate=2)(input_layer)
-    conv_lstm1 = keras.layers.BatchNormalization()(conv_lstm1)
-    conv_lstm1 = keras.layers.ReLU()(conv_lstm1)
-    conv_lstm1 = keras.layers.AveragePooling1D(2, padding='same')(conv_lstm1)
-    conv_lstm1 = keras.layers.Dropout(0.3)(conv_lstm1)
+    # STFT - CNN:
+    conv2d_1 = conv2d_block(filters=4, kernel_size=3, pooling='avg', padding='same', input_layer=stft_input_layer)
+    conv2d_2 = conv2d_block(filters=8, kernel_size=3, padding='same', input_layer=conv2d_1)
+    conv2d_3 = conv2d_block(filters=16, kernel_size=(4, 2), input_layer=conv2d_2)
+    conv2d_4 = conv2d_block(filters=32, kernel_size=(4, 2), input_layer=conv2d_3)
+    # conv_5 = conv2d_block(filters=64, kernel_size=(3, 2), input_layer=conv_4)
+    # conv_6 = conv2d_block(filters=128, kernel_size=(3, 2), input_layer=conv_5)
+    # conv_7 = conv2d_block(filters=256, kernel_size=(3, 2), input_layer=conv_6)
 
-    conv_lstm2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv_lstm1)
-    conv_lstm2 = keras.layers.BatchNormalization()(conv_lstm2)
-    conv_lstm2 = keras.layers.ReLU()(conv_lstm2)
-    conv_lstm2 = keras.layers.MaxPooling1D(2, padding='same')(conv_lstm2)
+    stft_gap = keras.layers.GlobalAveragePooling2D()(conv2d_3)
 
+    # Duplo - RNN:
+    conv_lstm1 = conv1d_block(orig_input_layer, filters=128, kernel_size=3, pooling='avg')
+    conv_lstm2 = conv1d_block(conv_lstm1, filters=128, kernel_size=3)
     lstm_1 = keras.layers.LSTM(128)(conv_lstm2)
     lstm_1 = keras.layers.Reshape((128, -1))(lstm_1)
-    
-    conv_lstm3 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same", dilation_rate=2)(lstm_1)
-    conv_lstm3 = keras.layers.BatchNormalization()(conv_lstm3)
-    conv_lstm3 = keras.layers.ReLU()(conv_lstm3)
-    conv_lstm3 = keras.layers.AveragePooling1D(2, padding='same')(conv_lstm3)
-    conv_lstm3 = keras.layers.Dropout(0.3)(conv_lstm3)
-
-    conv_lstm4 = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same")(conv_lstm3)
-    conv_lstm4 = keras.layers.BatchNormalization()(conv_lstm4)
-    conv_lstm4 = keras.layers.ReLU()(conv_lstm4)
-    conv_lstm4 = keras.layers.MaxPooling1D(2, padding='same')(conv_lstm4)
-
+    conv_lstm3 = conv1d_block(lstm_1, filters=64, kernel_size=3, pooling='avg')
+    conv_lstm4 = conv1d_block(conv_lstm3, filters=64, kernel_size=3)
     lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
 
-    conv1 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="causal", dilation_rate=2)(input_layer)
-    conv1 = keras.layers.BatchNormalization()(conv1)
-    conv1 = keras.layers.ReLU()(conv1)
-    conv1 = keras.layers.AveragePooling1D(2, padding='same')(conv1)
-    conv1 = keras.layers.Dropout(0.1)(conv1)
+    # Duplo CNN:
+    conv1 = conv1d_block(orig_input_layer, filters=128, kernel_size=3, pooling='avg', padding='causal')
+    conv2 = conv1d_block(conv1, filters=128, kernel_size=3)
+    conv3 = conv1d_block(conv2, filters=128, kernel_size=3)
+    conv4 = conv1d_block(conv3, filters=128, kernel_size=3)
+    conv5 = conv1d_block(conv4, filters=64, kernel_size=3)
+    conv6 = conv1d_block(conv5, filters=64, kernel_size=3)
+    conv7 = conv1d_block(conv6, filters=64, kernel_size=3)
+    conv8 = conv1d_block(conv7, filters=64, kernel_size=3)
 
-    conv2 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv1)
-    conv2 = keras.layers.BatchNormalization()(conv2)
-    conv2 = keras.layers.ReLU()(conv2)
-    conv2 = keras.layers.MaxPooling1D(2, padding='same')(conv2)
-    conv2 = keras.layers.Dropout(0.15)(conv2)
+    duplo_gap = keras.layers.GlobalAveragePooling1D()(conv8)
 
-    conv3= keras.layers.Conv1D(filters=128, kernel_size=3, padding='same')(conv2)
-    # conv3 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="valid")(conv2)
-    conv3 = keras.layers.BatchNormalization()(conv3)
-    conv3 = keras.layers.ReLU()(conv3)
-    conv3 = keras.layers.MaxPooling1D(2, padding='same')(conv3)
-    conv3 = keras.layers.Dropout(0.2)(conv3)
-
-    conv4 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv3)
-    conv4 = keras.layers.BatchNormalization()(conv4)
-    conv4 = keras.layers.ReLU()(conv4)
-    conv4 = keras.layers.MaxPooling1D(2, padding='same')(conv4)
-    conv4 = keras.layers.Dropout(0.2)(conv4)
-
-    conv5 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv4)
-    conv5 = keras.layers.BatchNormalization()(conv5)
-    conv5 = keras.layers.ReLU()(conv5)
-    conv5 = keras.layers.MaxPooling1D(2, padding='same')(conv5)
-    conv5 = keras.layers.Dropout(0.2)(conv5)
-
-    conv6 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv5)
-    conv6 = keras.layers.BatchNormalization()(conv6)
-    conv6 = keras.layers.ReLU()(conv6)
-    conv6 = keras.layers.MaxPooling1D(2, padding='same')(conv6)
-
-    conv7 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv6)
-    conv7 = keras.layers.BatchNormalization()(conv7)
-    conv7 = keras.layers.ReLU()(conv7)
-    conv7 = keras.layers.MaxPooling1D(2, padding='same')(conv7)
-
-    conv8 = keras.layers.Conv1D(filters=128, kernel_size=3, padding="same")(conv7)
-    conv8 = keras.layers.BatchNormalization()(conv8)
-    conv8 = keras.layers.ReLU()(conv8)
-    conv8 = keras.layers.MaxPooling1D(2, padding='same')(conv8)
-    #
-    # flattened = keras.layers.Flatten()(conv8)
-    #
-    # gap = keras.layers.Dense(500, activation="relu")(flattened)
-
-    gap = keras.layers.GlobalAveragePooling1D()(conv8)
-    # cnn_out = keras.layers.Dense(num_classes, activation="softmax")(gap)
-
-    concatted = keras.layers.Concatenate()([gap, lstm_2])
+    concatted = keras.layers.Concatenate()([duplo_gap, stft_gap, lstm_2])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
-    return keras.models.Model(inputs=input_layer, outputs=output_layer)
+    return keras.models.Model(inputs=orig_input_layer, outputs=output_layer)
 
 def get_training_data(data_dir: Path):
     sample_length = 21600
