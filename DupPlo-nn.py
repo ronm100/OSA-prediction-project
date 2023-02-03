@@ -110,9 +110,9 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, override_l
     keras.utils.plot_model(model, to_file = log_dir.joinpath("architecture.png"), show_shapes=True)
     epochs = 1000
     batch_size = 32
-    callbacks = [keras.callbacks.ModelCheckpoint(log_dir.joinpath("best_model.h5"), save_best_only=True, monitor="val_loss"),
-                 keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.00001),
-                 keras.callbacks.EarlyStopping(monitor="val_loss", patience=15, verbose=1),]
+    callbacks = [keras.callbacks.ModelCheckpoint(log_dir.joinpath("best_model.h5"), save_best_only=True, monitor="val_sparse_categorical_accuracy"),
+                 keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=0.000001),
+                 keras.callbacks.EarlyStopping(monitor="val_sparse_categorical_accuracy", patience=20, verbose=1, start_from_epoch=100, restore_best_weights=True, mode='max'),]
 
     model.compile (optimizer="adam",loss="sparse_categorical_crossentropy",
                    metrics=['sparse_categorical_accuracy'])
@@ -122,7 +122,7 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, override_l
 
     # eval_results = model.evaluate(validation_inputs, y_val)
 
-
+    model = keras.models.load_model(log_dir.joinpath("best_model.h5"))
     y_pred_probs = model.predict(validation_inputs)
     y_pred = np.argmax(y_pred_probs, axis=1)
     f1 = "%.3f" % f1_score(y_val, y_pred, average='macro')
