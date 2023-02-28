@@ -2,6 +2,8 @@ import pyedflib
 import numpy as np
 import csv
 import os
+import pickle
+import shutil
 from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -39,8 +41,10 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     orig_input_layer = keras.layers.Input(orig_input_shape)
     stft_input_layer = keras.layers.Input(stft_input_shape)
 
-    p1 = trial.suggest_float("dropout_1", 0.0, 0.55) 
-    p2 = trial.suggest_float("dropout_2", 0.0, 0.55) 
+    # p1 = trial.suggest_float("dropout_1", 0.0, 0.55) 
+    # p2 = trial.suggest_float("dropout_2", 0.0, 0.55) 
+    p1 = 0.17387701072284564
+    p2 = 0.3900830062896643
 
     # STFT - CNN:
     conv2d_1 = conv2d_block(filters=4, kernel_size=(3,9), dropout=p1, pooling='avg', input_layer=stft_input_layer)
@@ -75,7 +79,15 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     cnn_flat = keras.layers.Flatten()(conv8)
     cnn_flat = keras.layers.Dense(128, activation="softmax")(cnn_flat)
 
-    concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, lstm_2])
+    cnn_factor = trial.suggest_float("cnn_factor", 0.0, 1.0) 
+    stft_factor = trial.suggest_float("stft_factor", 0.0, 1.0) 
+    rnn_factor = trial.suggest_float("rnn_factor", 0.0, 1.0) 
+
+    cnn_flat = keras.layers.Lambda(lambda x: x * cnn_factor)(cnn_flat)
+    stft_flat = keras.layers.Lambda(lambda x: x * stft_factor)(stft_flat)
+    rnn_flat = keras.layers.Lambda(lambda x: x * rnn_factor)(lstm_2)
+
+    concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, rnn_flat])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
     return keras.models.Model(inputs=[orig_input_layer, stft_input_layer], outputs=output_layer)
@@ -111,7 +123,8 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, log_dir, t
                  keras.callbacks.EarlyStopping(monitor="val_sparse_categorical_accuracy", patience=20, verbose=1, restore_best_weights=True, mode='max'),
                  optuna.integration.TFKerasPruningCallback(trial, "val_loss")]
 
-    lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True) # log=True, will use log scale to interplolate b
+    # lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True) # log=True, will use log scale to interplolate b
+    lr = 0.006779359362044838
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
     optimizer = getattr(keras.optimizers, optimizer_name)(learning_rate=lr)
     model.compile (optimizer=optimizer ,loss="sparse_categorical_crossentropy",
@@ -190,7 +203,7 @@ def log_results(results, log_dir):
 
     
 def objective(trial):
-    log_dir = LOG_BASE_DIR.joinpath(model_name).joinpath(str(trial.number)) #joinpath('trial.number')
+    log_dir = log_sub_dir.joinpath(str(trial.number)) #joinpath('trial.number')
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     results = train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, log_dir, trial)
@@ -200,7 +213,13 @@ def objective(trial):
 if __name__ == '__main__':
     # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
     stfts = [(128, 128)]
-    model_name = 'optuna_1'
+    model_name = 'optuna_branch_weights'
+    log_sub_dir = LOG_BASE_DIR.joinpath(model_name)
+    if not os.path.exists(log_sub_dir):
+        os.makedirs(log_sub_dir)
+    else:
+        raise ValueError(f'trying to override {log_sub_dir}')
+        pass
     stft_name = f'stft_128_128'
     x_train, x_val, stft_train, stft_val, y_train, y_val = get_training_val_data(stft_name)
     # print(f'acc = {objective(None)}')
@@ -226,5 +245,9 @@ if __name__ == '__main__':
     print("  Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
+    
+    shutil.copy('out.log', log_sub_dir)
+    with open(log_sub_dir.joinpath('study_pkl'), 'wb') as f
+        pickle.dump(study, f)
 
-    optuna.visualization.plot_param_importances(study)
+    optuna.visualization.plot_param_importances(study).show()
