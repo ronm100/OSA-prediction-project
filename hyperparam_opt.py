@@ -45,6 +45,9 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     # p2 = trial.suggest_float("dropout_2", 0.0, 0.55) 
     p1 = 0.17387701072284564
     p2 = 0.3900830062896643
+    cnn_factor = trial.suggest_int("cnn_factor", 16, 256)
+    stft_factor = trial.suggest_int("stft_factor", 16, 256)
+    rnn_factor = trial.suggest_int("rnn_factor", 16, 256)
 
     # STFT - CNN:
     conv2d_1 = conv2d_block(filters=4, kernel_size=(3,9), dropout=p1, pooling='avg', input_layer=stft_input_layer)
@@ -56,7 +59,7 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     conv2d_7 = conv2d_block(filters=256, pool_size=2, dropout=p2,input_layer=conv2d_6)
     conv2d_8 = conv2d_block(filters=256, pool_size=2, dropout=p2,input_layer=conv2d_7)
     stft_flat = keras.layers.Flatten()(conv2d_8)
-    stft_flat = keras.layers.Dense(128, activation="softmax")(stft_flat)
+    stft_flat = keras.layers.Dense(stft_factor, activation="softmax")(stft_flat)
 
     # Duplo - RNN:
     conv_lstm1 = conv1d_block(orig_input_layer, filters=32, kernel_size=9, dropout=p1, pooling='avg')
@@ -66,6 +69,7 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     conv_lstm3 = conv1d_block(lstm_1, filters=128, kernel_size=3,dropout=p2, pooling='avg')
     conv_lstm4 = conv1d_block(conv_lstm3, filters=128,dropout=p2, kernel_size=3)
     lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
+    rnn_flat = keras.layers.Dense(rnn_factor, activation="softmax")(lstm_2)
 
     # Duplo CNN:
     conv1 = conv1d_block(orig_input_layer, filters=16, kernel_size=9, dropout=p1, pooling='avg', pool_size=4)
@@ -77,15 +81,7 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     conv7 = conv1d_block(conv6, filters=128, dropout=p2,kernel_size=3)
     conv8 = conv1d_block(conv7, filters=256, dropout=p2,kernel_size=3)
     cnn_flat = keras.layers.Flatten()(conv8)
-    cnn_flat = keras.layers.Dense(128, activation="softmax")(cnn_flat)
-
-    cnn_factor = trial.suggest_float("cnn_factor", 0.0, 1.0) 
-    stft_factor = trial.suggest_float("stft_factor", 0.0, 1.0) 
-    rnn_factor = trial.suggest_float("rnn_factor", 0.0, 1.0) 
-
-    cnn_flat = keras.layers.Lambda(lambda x: x * cnn_factor)(cnn_flat)
-    stft_flat = keras.layers.Lambda(lambda x: x * stft_factor)(stft_flat)
-    rnn_flat = keras.layers.Lambda(lambda x: x * rnn_factor)(lstm_2)
+    cnn_flat = keras.layers.Dense(cnn_factor, activation="softmax")(cnn_flat)
 
     concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, rnn_flat])
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
@@ -125,7 +121,8 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, log_dir, t
 
     # lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True) # log=True, will use log scale to interplolate b
     lr = 0.006779359362044838
-    optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+    # optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+    optimizer_name = "Adam"
     optimizer = getattr(keras.optimizers, optimizer_name)(learning_rate=lr)
     model.compile (optimizer=optimizer ,loss="sparse_categorical_crossentropy",
                    metrics=['sparse_categorical_accuracy'])
@@ -211,9 +208,10 @@ def objective(trial):
     return results[3] # acc
 
 if __name__ == '__main__':
+    # python -u hyperparam_opt.py 2>&1 | tee out.log
     # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
     stfts = [(128, 128)]
-    model_name = 'optuna_branch_weights'
+    model_name = 'optuna_branch_weights_by_size'
     log_sub_dir = LOG_BASE_DIR.joinpath(model_name)
     if not os.path.exists(log_sub_dir):
         os.makedirs(log_sub_dir)
@@ -247,7 +245,7 @@ if __name__ == '__main__':
         print("    {}: {}".format(key, value))
     
     shutil.copy('out.log', log_sub_dir)
-    with open(log_sub_dir.joinpath('study_pkl'), 'wb') as f
+    with open(log_sub_dir.joinpath('study_pkl'), 'wb') as f:
         pickle.dump(study, f)
 
     optuna.visualization.plot_param_importances(study).show()
