@@ -41,50 +41,67 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     orig_input_layer = keras.layers.Input(orig_input_shape)
     stft_input_layer = keras.layers.Input(stft_input_shape)
 
-    # p1 = trial.suggest_float("dropout_1", 0.0, 0.55) 
-    # p2 = trial.suggest_float("dropout_2", 0.0, 0.55) 
-    p1 = 0.17387701072284564
-    p2 = 0.3900830062896643
-    cnn_factor = trial.suggest_int("cnn_factor", 16, 256)
-    stft_factor = trial.suggest_int("stft_factor", 16, 256)
-    rnn_factor = trial.suggest_int("rnn_factor", 16, 256)
+    p1 = trial.suggest_float("dropout_1", 0.0, 0.55)
+    n_cnn_layers = trial.suggest_int("n_cnn_layers", 4, 11)
+    filter_expansion_factor = trial.suggest_int("filter_expansion_factor", 1, 4)
+    max_kernel_size = trial.suggest_int("max_kernel_size", 8, 15)
+    kernel_contraction_factor = trial.suggest_int("kernel_contraction_factor", 1, 4)
+    p2 = trial.suggest_float("dropout_2", 0.0, 0.55)
+    # p3 = trial.suggest_float("dropout_3", 0.0, 0.55)
+    # p1 = 0.17387701072284564
+    # p2 = 0.3900830062896643
+    # cnn_factor = trial.suggest_int("cnn_factor", 8, 256)
+    # stft_factor = trial.suggest_int("stft_factor", 8, 256)
+    # rnn_factor = trial.suggest_int("rnn_factor", 8, 256)
 
-    # STFT - CNN:
-    conv2d_1 = conv2d_block(filters=4, kernel_size=(3,9), dropout=p1, pooling='avg', input_layer=stft_input_layer)
-    conv2d_2 = conv2d_block(filters=8, kernel_size=(3,9), dropout=p2, input_layer=conv2d_1)
-    conv2d_3 = conv2d_block(filters=16, kernel_size=(3,5), dropout=p2,input_layer=conv2d_2)
-    conv2d_4 = conv2d_block(filters=32, pool_size=2, dropout=p2,input_layer=conv2d_3)
-    conv2d_5 = conv2d_block(filters=64, pool_size=2, dropout=p2,input_layer=conv2d_4)
-    conv2d_6 = conv2d_block(filters=128, pool_size=2, dropout=p2,input_layer=conv2d_5)
-    conv2d_7 = conv2d_block(filters=256, pool_size=2, dropout=p2,input_layer=conv2d_6)
-    conv2d_8 = conv2d_block(filters=256, pool_size=2, dropout=p2,input_layer=conv2d_7)
-    stft_flat = keras.layers.Flatten()(conv2d_8)
-    stft_flat = keras.layers.Dense(stft_factor, activation="softmax")(stft_flat)
+    # # STFT - CNN:
+    # conv2d_1 = conv2d_block(filters=4, kernel_size=(3,9), dropout=p1, pooling='avg', input_layer=stft_input_layer)
+    # conv2d_2 = conv2d_block(filters=8, kernel_size=(3,9), dropout=p1, input_layer=conv2d_1)
+    # conv2d_3 = conv2d_block(filters=16, kernel_size=(3,5), dropout=p1,input_layer=conv2d_2)
+    # conv2d_4 = conv2d_block(filters=32, pool_size=2, dropout=p1,input_layer=conv2d_3)
+    # conv2d_5 = conv2d_block(filters=64, pool_size=2, dropout=p1,input_layer=conv2d_4)
+    # conv2d_6 = conv2d_block(filters=128, pool_size=2, dropout=p1,input_layer=conv2d_5)
+    # conv2d_7 = conv2d_block(filters=256, pool_size=2, dropout=p1,input_layer=conv2d_6)
+    # conv2d_8 = conv2d_block(filters=256, pool_size=2, dropout=p1,input_layer=conv2d_7)
+    # stft_flat = keras.layers.Flatten()(conv2d_8)
+    # stft_flat = keras.layers.Dense(stft_factor, activation="softmax")(stft_flat)
+    #
+    # # Duplo - RNN:
+    # conv_lstm1 = conv1d_block(orig_input_layer, filters=32, kernel_size=9, dropout=p2, pooling='avg')
+    # conv_lstm2 = conv1d_block(conv_lstm1, filters=64,dropout=p2, kernel_size=3)
+    # lstm_1 = keras.layers.LSTM(64)(conv_lstm2)
+    # lstm_1 = keras.layers.Reshape((64, -1))(lstm_1)
+    # conv_lstm3 = conv1d_block(lstm_1, filters=128, kernel_size=3,dropout=p2, pooling='avg')
+    # conv_lstm4 = conv1d_block(conv_lstm3, filters=128,dropout=p2, kernel_size=3)
+    # lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
+    # rnn_flat = keras.layers.Dense(rnn_factor, activation="softmax")(lstm_2)
+    #
+    # # Duplo CNN:
+    # conv1 = conv1d_block(orig_input_layer, filters=16, kernel_size=9, dropout=p3, pooling='avg', pool_size=4)
+    # conv2 = conv1d_block(conv1, filters=16, kernel_size=3,dropout=p3, pool_size=4)
+    # conv3 = conv1d_block(conv2, filters=32, kernel_size=3,dropout=p3, pool_size=4)
+    # conv4 = conv1d_block(conv3, filters=32,dropout=p3, kernel_size=3)
+    # conv5 = conv1d_block(conv4, filters=64,dropout=p3, kernel_size=3, pool_size=4)
+    # conv6 = conv1d_block(conv5, filters=64,dropout=p3, kernel_size=3)
+    # conv7 = conv1d_block(conv6, filters=128, dropout=p3,kernel_size=3)
+    # conv8 = conv1d_block(conv7, filters=256, dropout=p3,kernel_size=3)
+    # cnn_flat = keras.layers.Flatten()(conv8)
+    # cnn_flat = keras.layers.Dense(cnn_factor, activation="softmax")(cnn_flat)
 
-    # Duplo - RNN:
-    conv_lstm1 = conv1d_block(orig_input_layer, filters=32, kernel_size=9, dropout=p1, pooling='avg')
-    conv_lstm2 = conv1d_block(conv_lstm1, filters=64,dropout=p2, kernel_size=3)
-    lstm_1 = keras.layers.LSTM(64)(conv_lstm2)
-    lstm_1 = keras.layers.Reshape((64, -1))(lstm_1)
-    conv_lstm3 = conv1d_block(lstm_1, filters=128, kernel_size=3,dropout=p2, pooling='avg')
-    conv_lstm4 = conv1d_block(conv_lstm3, filters=128,dropout=p2, kernel_size=3)
-    lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
-    rnn_flat = keras.layers.Dense(rnn_factor, activation="softmax")(lstm_2)
+    # concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, rnn_flat])
+    # output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
 
     # Duplo CNN:
-    conv1 = conv1d_block(orig_input_layer, filters=16, kernel_size=9, dropout=p1, pooling='avg', pool_size=4)
-    conv2 = conv1d_block(conv1, filters=16, kernel_size=3,dropout=p2, pool_size=4)
-    conv3 = conv1d_block(conv2, filters=32, kernel_size=3,dropout=p2, pool_size=4)
-    conv4 = conv1d_block(conv3, filters=32,dropout=p2, kernel_size=3)
-    conv5 = conv1d_block(conv4, filters=64,dropout=p2, kernel_size=3, pool_size=4)
-    conv6 = conv1d_block(conv5, filters=64,dropout=p2, kernel_size=3)
-    conv7 = conv1d_block(conv6, filters=128, dropout=p2,kernel_size=3)
-    conv8 = conv1d_block(conv7, filters=256, dropout=p2,kernel_size=3)
-    cnn_flat = keras.layers.Flatten()(conv8)
-    cnn_flat = keras.layers.Dense(cnn_factor, activation="softmax")(cnn_flat)
+    cnn = conv1d_block(orig_input_layer, filters=16, kernel_size=max_kernel_size, dropout=p1, pooling='avg', pool_size=4)
+    for i in range(n_cnn_layers):
+        n_filters_exp = ((i + 1) // filter_expansion_factor) + 4
+        n_filters = min(2 ** n_filters_exp, 512)
+        kernel_size = max(3, max_kernel_size - i * kernel_contraction_factor)
+        cnn = conv1d_block(cnn, filters=n_filters, kernel_size=kernel_size,dropout=p2, pool_size=4)
+    cnn = keras.layers.GlobalAveragePooling1D()(cnn)
+    output_layer = keras.layers.Dense(num_classes, activation="softmax")(cnn)
 
-    concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, rnn_flat])
-    output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
+
 
     return keras.models.Model(inputs=[orig_input_layer, stft_input_layer], outputs=output_layer)
 
@@ -119,10 +136,10 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, log_dir, t
                  keras.callbacks.EarlyStopping(monitor="val_sparse_categorical_accuracy", patience=20, verbose=1, restore_best_weights=True, mode='max'),
                  optuna.integration.TFKerasPruningCallback(trial, "val_loss")]
 
-    # lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True) # log=True, will use log scale to interplolate b
-    lr = 0.006779359362044838
-    # optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
-    optimizer_name = "Adam"
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True) # log=True, will use log scale to interplolate b
+    # lr = 0.006779359362044838
+    optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+    # optimizer_name = "Adam"
     optimizer = getattr(keras.optimizers, optimizer_name)(learning_rate=lr)
     model.compile (optimizer=optimizer ,loss="sparse_categorical_crossentropy",
                    metrics=['sparse_categorical_accuracy'])
@@ -211,7 +228,7 @@ if __name__ == '__main__':
     # python -u hyperparam_opt.py 2>&1 | tee out.log
     # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
     stfts = [(128, 128)]
-    model_name = 'optuna_branch_weights_by_size'
+    model_name = 'optuna_cnn_only'
     log_sub_dir = LOG_BASE_DIR.joinpath(model_name)
     if not os.path.exists(log_sub_dir):
         os.makedirs(log_sub_dir)
@@ -220,13 +237,9 @@ if __name__ == '__main__':
         pass
     stft_name = f'stft_128_128'
     x_train, x_val, stft_train, stft_val, y_train, y_val = get_training_val_data(stft_name)
-    # print(f'acc = {objective(None)}')
-    # train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, override_logs=True)
-
-    
 
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.HyperbandPruner())
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=200)
     pruned_trials = study.get_trials(deepcopy=False, states=[optuna.trial.TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[optuna.trial.TrialState.COMPLETE])
 

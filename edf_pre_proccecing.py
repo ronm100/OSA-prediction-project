@@ -18,22 +18,16 @@ num_of_samples = 5755
 
 def apply_stft(x_train, x_val, n_fft, win_length):
     train_stft, val_stft = list(), list()
-    i = 0
-    # t_1, t_2 = time.time(), time.time()
+
     for train_sample in x_train:
         train_sample = train_sample.reshape(train_sample.shape[0], )
         train_stft.append(abs(stft(train_sample, n_fft=n_fft, win_length=win_length)))
-        # i += 1
-        # t_2 = t_1
-        # t_1 = time.time()
-        # if i % 200 != 0:
-        #     print(f'time_delta: {t_1 - t_2}, i / 200 = {i / 200}')
 
     for val_sample in x_val:
         val_sample = val_sample.reshape(val_sample.shape[0], )
         val_stft.append(abs(stft(val_sample, n_fft=n_fft, win_length=win_length)))
 
-    return np.expand_dims(np.array(train_stft), axis=3), np.expand_dims(np.array(val_stft), axis=3)
+    return np.expand_dims(np.array(train_stft), axis=3), np.expand_dims(np.array(val_stft), axis=3) if len(x_val) else np.expand_dims(np.array(train_stft), axis=3)
 
 
 def ahi_to_label(ahi):
@@ -150,9 +144,30 @@ def compute_and_save_stft(dir_path, n_fft, window_length):
     with open(y_v_path, 'wb') as y_v_file:
         np.save(y_v_file, y_test)
 
+def compute_and_save_stft_test(dir_path, n_fft, window_length):
+    x = pd.read_csv(dir_path.joinpath('x_train.csv'))
+    x = np.array(x)
+    x = x[:, 0:21600]
+    x = x.reshape((x.shape[0], x.shape[1], 1))
+    y = pd.read_csv(dir_path.joinpath('y_train.csv'), nrows=num_of_samples)
+    y = np.array(y)[0:num_of_samples, 1]
+    y = y.reshape(num_of_samples, -1)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.20, random_state=42)
+    x_test_stft = apply_stft(x_test, [], n_fft, window_length)
+
+    # Save data:
+    dir_path = dir_path.joinpath(Path('stft'))
+    new_dir = dir_path.joinpath(Path(f'stft_{n_fft}_{window_length}'))
+    x_test_path = new_dir.joinpath(Path('x_test'))
+    if not Path.exists(new_dir):
+        Path.mkdir(new_dir)
+
+    with open(x_test_path, 'wb') as x_test_file:
+        np.save(x_test_file, x_test_stft)
+
 if __name__ == '__main__':
-    # stft_pairs = [(128, 16), (128, 8), (256, 16), (256, 8), (512, 8)]
-    stft_pairs = [(128, 128), (128, 64), (64, 50), (64, 32), (64, 8),]
+    stft_pairs = [(128, 128)]
+    # stft_pairs = [(128, 128), (128, 64), (64, 50), (64, 32), (64, 8),]
     for n_fft, window_length in stft_pairs:
-        compute_and_save_stft(CSV_DIR, n_fft, window_length)
+        compute_and_save_stft_test(CSV_DIR, n_fft, window_length)
         print(f'{n_fft}, {window_length} finished')
