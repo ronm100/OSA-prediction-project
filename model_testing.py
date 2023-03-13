@@ -7,7 +7,7 @@ import numpy as np
 
 ROOT = Path('../../../../..')
 LOG_BASE_DIR = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/logs')
-MODEL_DIR = LOG_BASE_DIR.joinpath('optuna_multiparam/31')
+MODEL_DIR = LOG_BASE_DIR.joinpath('optuna_cnn_only_5_dropouts/166')
 MODEL_PATH = MODEL_DIR.joinpath('best_model.h5')
 CSV_DIR = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/processed_data_as_csv')
 STFT_DIR = CSV_DIR.joinpath('stft')

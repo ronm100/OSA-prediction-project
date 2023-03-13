@@ -45,8 +45,12 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     n_cnn_layers = trial.suggest_int("n_cnn_layers", 4, 11)
     filter_expansion_factor = trial.suggest_int("filter_expansion_factor", 1, 4)
     max_kernel_size = trial.suggest_int("max_kernel_size", 8, 15)
-    kernel_contraction_factor = trial.suggest_int("kernel_contraction_factor", 1, 4)
+    kernel_contraction_factor = trial.suggest_categorical("kernel_contraction_factor", [2, 4])
     p2 = trial.suggest_float("dropout_2", 0.0, 0.55)
+    p3 = trial.suggest_float("dropout_2", 0.0, 0.55)
+    p4 = trial.suggest_float("dropout_2", 0.0, 0.55)
+    p5 = trial.suggest_float("dropout_2", 0.0, 0.55)
+    dropouts = [p1, p2, p2, p2, p3, p3, p3, p4 , p4, p5, p5]
     # p3 = trial.suggest_float("dropout_3", 0.0, 0.55)
     # p1 = 0.17387701072284564
     # p2 = 0.3900830062896643
@@ -97,7 +101,7 @@ def make_model(orig_input_shape, stft_input_shape, trial):
         n_filters_exp = ((i + 1) // filter_expansion_factor) + 4
         n_filters = min(2 ** n_filters_exp, 512)
         kernel_size = max(3, max_kernel_size - i * kernel_contraction_factor)
-        cnn = conv1d_block(cnn, filters=n_filters, kernel_size=kernel_size,dropout=p2, pool_size=4)
+        cnn = conv1d_block(cnn, filters=n_filters, kernel_size=kernel_size,dropout=dropouts[i], pool_size=4)
     cnn = keras.layers.GlobalAveragePooling1D()(cnn)
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(cnn)
 
@@ -228,7 +232,7 @@ if __name__ == '__main__':
     # python -u hyperparam_opt.py 2>&1 | tee out.log
     # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
     stfts = [(128, 128)]
-    model_name = 'optuna_cnn_only'
+    model_name = 'optuna_cnn_only_5_dropouts'
     log_sub_dir = LOG_BASE_DIR.joinpath(model_name)
     if not os.path.exists(log_sub_dir):
         os.makedirs(log_sub_dir)
