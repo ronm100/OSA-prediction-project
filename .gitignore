@@ -1,6 +1,7 @@
-
+logs/*
+1_gru_test/*
 *.edf
 .idea/*
 *.h5
 *.zip
-
+.ssh/*
