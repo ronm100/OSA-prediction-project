@@ -1,15 +1,8 @@
-import pyedflib
 import numpy as np
-import csv
 import os
-from tensorflow import keras
 import matplotlib.pyplot as plt
 import pandas as pd
 from pydot import *
-from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
-from sklearn.model_selection import train_test_split
-import sys
-# from keras import backend as K
 from scipy.signal import savgol_filter
 
 

@@ -4,7 +4,6 @@ import os
 import pandas as pd
 import sys
 from librosa import stft
-import pickle
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 
@@ -60,8 +59,8 @@ def edf_get_oximetry(edf_path):
 
 def edf_to_csv():
     x_train = []
-    semple_length = 21600
-    num_of_semples = 5800
+    sample_length = 21600
+    num_of_samples = 5800
     y_train = get_labels('./shhs1-dataset-0.14.0.csv')
     y_train = np.array(y_train)
     if not os.path.exists(CSV_DIR):
@@ -80,36 +79,26 @@ def edf_to_csv():
         if temp is None:
             continue
         edf_index = int(path[7:12])
-        if np.shape(temp)[0] >= semple_length:
-            temp = temp[0:semple_length]
+        if np.shape(temp)[0] >= sample_length:
+            temp = temp[0:sample_length]
             x_train.append(temp)
             x_indexes.append(edf_index - 1)
             if (edf_index - 1) != last_index:
                 for i in range(last_index, edf_index - 1):
                     skipped_indexes.append(i)
-                    print(f'skipped unvalid semple: ' + str(i))
+                    print(f'skipped invalid sample: ' + str(i))
             if ((edf_index - 1) % 10) == 0:
-                print('semple number = ' + str(edf_index - 1))
+                print('sample number = ' + str(edf_index - 1))
             last_index = edf_index
     pd.DataFrame(y_train).to_csv(CSV_DIR + '/' + 'y_train_full.csv')
     y_train = y_train[x_indexes]
     x_train = np.stack(x_train, axis=0)
     pd.DataFrame(x_train).to_csv(CSV_DIR + '/' + 'x_train.csv')
     pd.DataFrame(y_train).to_csv(CSV_DIR + '/' + 'y_train.csv')
-    pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_semples_inedex.csv')
-    pd.DataFrame(skipped_indexes).to_csv(CSV_DIR + '/' + 'skipped_semples.csv')
+    pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_samples_inedex.csv')
+    pd.DataFrame(skipped_indexes).to_csv(CSV_DIR + '/' + 'skipped_samples.csv')
     x_indexes = [x_indexes, y_train]
-    pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_semples_inedex_with_lables.csv')
-
-
-def compute_and_save_dft(dir_path):
-    x_train = pd.read_csv(dir_path + 'x_train.csv')
-    x_train_fft = np.fft.rfft(x_train, axis=-1)
-    x_train_fft_norm = np.abs(x_train_fft) ** 2
-    x_train_fft_tensor = np.array((x_train_fft.real, x_train_fft.imag))  # should be tensor of shape (x,x,2)
-    pd.DataFrame(x_train_fft_norm).to_csv(dir_path + 'x_train_fft_norm.csv')
-    pd.DataFrame(x_train_fft.real).to_csv(dir_path + 'x_train_fft_real.csv')
-    pd.DataFrame(x_train_fft.imag).to_csv(dir_path + 'x_train_fft_imag.csv')
+    pd.DataFrame(x_indexes).to_csv(CSV_DIR + '/' + 'valid_samples_inedex_with_lables.csv')
 
 
 def compute_and_save_stft(dir_path, n_fft, window_length):

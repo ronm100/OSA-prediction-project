@@ -5,3 +5,5 @@ logs/*
 *.h5
 *.zip
 .ssh/*
+*.edf
+*.edf

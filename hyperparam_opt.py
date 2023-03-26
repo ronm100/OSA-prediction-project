@@ -1,6 +1,4 @@
-import pyedflib
 import numpy as np
-import csv
 import os
 import pickle
 import shutil
@@ -12,8 +10,7 @@ from pydot import *
 import optuna
 from sklearn.metrics import f1_score, confusion_matrix, roc_auc_score, accuracy_score, recall_score
 from sklearn.model_selection import train_test_split
-import sys
-# from keras import backend as K
+
 
 ROOT = Path('../../../../..')
 LOG_BASE_DIR = ROOT.joinpath('databases/ronmaishlos@staff.technion.ac.il/logs')
@@ -51,51 +48,7 @@ def make_model(orig_input_shape, stft_input_shape, trial):
     p4 = trial.suggest_float("dropout_2", 0.0, 0.55)
     p5 = trial.suggest_float("dropout_2", 0.0, 0.55)
     dropouts = [p1, p2, p2, p2, p3, p3, p3, p4 , p4, p5, p5]
-    # p3 = trial.suggest_float("dropout_3", 0.0, 0.55)
-    # p1 = 0.17387701072284564
-    # p2 = 0.3900830062896643
-    # cnn_factor = trial.suggest_int("cnn_factor", 8, 256)
-    # stft_factor = trial.suggest_int("stft_factor", 8, 256)
-    # rnn_factor = trial.suggest_int("rnn_factor", 8, 256)
 
-    # # STFT - CNN:
-    # conv2d_1 = conv2d_block(filters=4, kernel_size=(3,9), dropout=p1, pooling='avg', input_layer=stft_input_layer)
-    # conv2d_2 = conv2d_block(filters=8, kernel_size=(3,9), dropout=p1, input_layer=conv2d_1)
-    # conv2d_3 = conv2d_block(filters=16, kernel_size=(3,5), dropout=p1,input_layer=conv2d_2)
-    # conv2d_4 = conv2d_block(filters=32, pool_size=2, dropout=p1,input_layer=conv2d_3)
-    # conv2d_5 = conv2d_block(filters=64, pool_size=2, dropout=p1,input_layer=conv2d_4)
-    # conv2d_6 = conv2d_block(filters=128, pool_size=2, dropout=p1,input_layer=conv2d_5)
-    # conv2d_7 = conv2d_block(filters=256, pool_size=2, dropout=p1,input_layer=conv2d_6)
-    # conv2d_8 = conv2d_block(filters=256, pool_size=2, dropout=p1,input_layer=conv2d_7)
-    # stft_flat = keras.layers.Flatten()(conv2d_8)
-    # stft_flat = keras.layers.Dense(stft_factor, activation="softmax")(stft_flat)
-    #
-    # # Duplo - RNN:
-    # conv_lstm1 = conv1d_block(orig_input_layer, filters=32, kernel_size=9, dropout=p2, pooling='avg')
-    # conv_lstm2 = conv1d_block(conv_lstm1, filters=64,dropout=p2, kernel_size=3)
-    # lstm_1 = keras.layers.LSTM(64)(conv_lstm2)
-    # lstm_1 = keras.layers.Reshape((64, -1))(lstm_1)
-    # conv_lstm3 = conv1d_block(lstm_1, filters=128, kernel_size=3,dropout=p2, pooling='avg')
-    # conv_lstm4 = conv1d_block(conv_lstm3, filters=128,dropout=p2, kernel_size=3)
-    # lstm_2 = keras.layers.LSTM(128)(conv_lstm4)
-    # rnn_flat = keras.layers.Dense(rnn_factor, activation="softmax")(lstm_2)
-    #
-    # # Duplo CNN:
-    # conv1 = conv1d_block(orig_input_layer, filters=16, kernel_size=9, dropout=p3, pooling='avg', pool_size=4)
-    # conv2 = conv1d_block(conv1, filters=16, kernel_size=3,dropout=p3, pool_size=4)
-    # conv3 = conv1d_block(conv2, filters=32, kernel_size=3,dropout=p3, pool_size=4)
-    # conv4 = conv1d_block(conv3, filters=32,dropout=p3, kernel_size=3)
-    # conv5 = conv1d_block(conv4, filters=64,dropout=p3, kernel_size=3, pool_size=4)
-    # conv6 = conv1d_block(conv5, filters=64,dropout=p3, kernel_size=3)
-    # conv7 = conv1d_block(conv6, filters=128, dropout=p3,kernel_size=3)
-    # conv8 = conv1d_block(conv7, filters=256, dropout=p3,kernel_size=3)
-    # cnn_flat = keras.layers.Flatten()(conv8)
-    # cnn_flat = keras.layers.Dense(cnn_factor, activation="softmax")(cnn_flat)
-
-    # concatted = keras.layers.Concatenate()([cnn_flat, stft_flat, rnn_flat])
-    # output_layer = keras.layers.Dense(num_classes, activation="softmax")(concatted)
-
-    # Duplo CNN:
     cnn = conv1d_block(orig_input_layer, filters=16, kernel_size=max_kernel_size, dropout=p1, pooling='avg', pool_size=4)
     for i in range(n_cnn_layers):
         n_filters_exp = ((i + 1) // filter_expansion_factor) + 4
@@ -104,8 +57,6 @@ def make_model(orig_input_shape, stft_input_shape, trial):
         cnn = conv1d_block(cnn, filters=n_filters, kernel_size=kernel_size,dropout=dropouts[i], pool_size=4)
     cnn = keras.layers.GlobalAveragePooling1D()(cnn)
     output_layer = keras.layers.Dense(num_classes, activation="softmax")(cnn)
-
-
 
     return keras.models.Model(inputs=[orig_input_layer, stft_input_layer], outputs=output_layer)
 
@@ -151,7 +102,6 @@ def train_model(x_train, x_val, stft_train, stft_val, y_train, y_val, log_dir, t
     history = model.fit (training_inputs, y_train, batch_size=batch_size, epochs=epochs,
                         callbacks=callbacks, validation_data=(validation_inputs, y_val), verbose=1,)
 
-    # eval_results = model.evaluate(validation_inputs, y_val)
     y_pred_probs = model.predict(validation_inputs)
     y_pred = np.argmax(y_pred_probs, axis=1)
     f1 = "%.3f" % f1_score(y_val, y_pred, average='macro')
@@ -229,8 +179,6 @@ def objective(trial):
     return results[3] # acc
 
 if __name__ == '__main__':
-    # python -u hyperparam_opt.py 2>&1 | tee out.log
-    # stfts = [(128, 128), (128,16), (128, 64), (128, 8),(64, 50), (64, 32), (64, 8)]
     stfts = [(128, 128)]
     model_name = 'optuna_cnn_only_5_dropouts'
     log_sub_dir = LOG_BASE_DIR.joinpath(model_name)
@@ -238,7 +186,6 @@ if __name__ == '__main__':
         os.makedirs(log_sub_dir)
     else:
         raise ValueError(f'trying to override {log_sub_dir}')
-        pass
     stft_name = f'stft_128_128'
     x_train, x_val, stft_train, stft_val, y_train, y_val = get_training_val_data(stft_name)
 

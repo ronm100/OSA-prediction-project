@@ -113,5 +113,4 @@ def plot_label_distribution():
 
 
 if __name__ == '__main__':
-    # plot_categories()
     plot_label_distribution()
